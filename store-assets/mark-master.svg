@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="SVIS">
+  <g transform="translate(270 168) scale(5)">
+    <path fill="#E31B23" d="M48 4C27.6 4 11 20.6 11 41c0 26.2 31.5 49 32.8 50a7.3 7.3 0 0 0 8.4 0C53.5 90 85 67.2 85 41 85 20.6 68.4 4 48 4Z"/>
+    <circle cx="48" cy="40" r="25" fill="#fff"/>
+    <path fill="#7A1424" d="M30 25h34v10H45l19 13v23H30V61h19L30 48V25Zm10 10v8l14 10v-8L40 35Z"/>
+  </g>
+  <text x="512" y="760" text-anchor="middle" font-family="Arial,sans-serif" font-size="155" font-weight="800" letter-spacing="16" fill="#06264B">SVIS</text>
+</svg>

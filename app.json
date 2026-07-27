@@ -1,0 +1,63 @@
+{
+  "expo": {
+    "name": "SVIS",
+    "slug": "svis",
+    "version": "1.0.0",
+    "scheme": "svis",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#06264B"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.songdeedev.svis",
+      "infoPlist": {
+        "NSCameraUsageDescription": "SVIS uses the camera to capture defect photos and proof-of-repair photos during vehicle inspections.",
+        "NSPhotoLibraryUsageDescription": "SVIS needs access to your photo library to attach existing photos to inspection reports.",
+        "NSPhotoLibraryAddUsageDescription": "SVIS may save inspection photos to your photo library."
+      }
+    },
+    "android": {
+      "package": "com.songdeedev.svis",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#06264B"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "platforms": [
+      "android",
+      "ios"
+    ],
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-sqlite",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "kotlinVersion": "2.0.21"
+          }
+        }
+      ],
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {}
+    },
+    "owner": "peuanthinsan"
+  }
+}

@@ -1,0 +1,89 @@
+import { useEffect, useState } from 'react';
+import { IssueRow, fetchIssues, updateIssueStatus } from '../../api';
+import { t } from '../../i18n';
+
+const STATUSES = ['open', 'in_progress', 'completed'];
+
+export function IssuesMgmtTab() {
+  const [issues, setIssues] = useState<IssueRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('open');
+  const [error, setError] = useState('');
+  const [updating, setUpdating] = useState<string | null>(null);
+
+  function load(status: string) {
+    setLoading(true);
+    fetchIssues(status === 'all' ? undefined : status)
+      .then((data) => { setIssues(data); setLoading(false); })
+      .catch(() => { setError(t('error')); setLoading(false); });
+  }
+  useEffect(() => load(filter), [filter]);
+
+  async function changeStatus(issue: IssueRow, newStatus: string) {
+    setUpdating(issue.id);
+    try {
+      await updateIssueStatus(issue.id, newStatus);
+      setIssues((prev) => prev.map((i) => i.id === issue.id ? { ...i, status: newStatus } : i));
+    } catch (e: any) {
+      alert(e.message || t('error'));
+    } finally {
+      setUpdating(null);
+    }
+  }
+
+  const statusLabel: Record<string, string> = { open: t('open'), in_progress: t('inProgress'), completed: t('completed'), all: t('all') };
+  const nextStatus: Record<string, string | null> = { open: 'in_progress', in_progress: 'completed', completed: null };
+
+  return (
+    <div className="panel panel--flush">
+      <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <h2 style={{ margin: 0, flex: 1 }}>{t('adminIssuesMgmt')}</h2>
+        <div className="chip-row">
+          {['all', ...STATUSES].map((s) => (
+            <button key={s} type="button" className={`chip${filter === s ? ' chip--active' : ''}`} onClick={() => setFilter(s)}>
+              {statusLabel[s]}
+            </button>
+          ))}
+        </div>
+      </div>
+      {error && <div className="alert alert--error" style={{ margin: 12 }}>{error}</div>}
+      {loading ? (
+        <p className="muted" style={{ padding: 20 }}>{t('loading')}</p>
+      ) : (
+        <table className="data-table">
+          <thead>
+            <tr><th>{t('plate')}</th><th>{t('fleet')}</th><th>{t('inspector')}</th><th>{t('date')}</th><th>{t('status')}</th><th>{t('updateStatus')}</th></tr>
+          </thead>
+          <tbody>
+            {issues.length === 0 && <tr><td colSpan={6} className="table-empty">{t('noResults')}</td></tr>}
+            {issues.map((issue) => {
+              const next = nextStatus[issue.status];
+              return (
+                <tr key={issue.id}>
+                  <td><strong>{issue.plate_number}</strong></td>
+                  <td className="muted">{issue.fleet_id || issue.vehicle_fleet || '—'}</td>
+                  <td className="muted">{issue.inspector_name || '—'}</td>
+                  <td className="muted">{issue.inspection_date ? issue.inspection_date.slice(0, 10) : issue.created_at.slice(0, 10)}</td>
+                  <td><span className={`badge badge--${issue.status}`}>{statusLabel[issue.status]}</span></td>
+                  <td>
+                    {next && (
+                      <button
+                        type="button"
+                        className="btn btn--secondary"
+                        style={{ padding: '5px 10px', fontSize: 13 }}
+                        disabled={updating === issue.id}
+                        onClick={() => changeStatus(issue, next)}
+                      >
+                        → {statusLabel[next]}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}

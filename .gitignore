@@ -1,0 +1,75 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+web/node_modules/
+web/.npm-cache/
+public/dashboard/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.log
+*.pid
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env
+.env.*
+!.env.example
+!.env.local.example
+.npmrc
+
+# typescript
+*.tsbuildinfo
+
+# generated native folders
+/ios
+/android
+.vercel
+
+# EAS submission credentials — do not commit
+play-service-account.json
+appstore-connect-api-key.p8
+
+# Local DHL credential utilities — never commit
+scripts/reset-all-dvis-passwords.js
+scripts/verify-dvis-credentials.js
+
+# Operational imports contain staff, vehicle, and contact data
+scripts/data-*.json
+*.xlsx
+*.xls
+*.pptx
+*.csv
+*.tsv
+customer-data/
+customer-input/
+store-assets/screenshots/
+
+# Local AI/development tool state
+.serena/
+.superpowers/
+docs/superpowers/

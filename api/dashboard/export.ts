@@ -1,0 +1,374 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { neon } from '@neondatabase/serverless';
+import ExcelJS from 'exceljs';
+import { verifyAuth } from '../../lib/api-auth';
+import { brand, toArgb } from '../../branding';
+import { vehicleTypeLabel } from '../../lib/types';
+
+function vehicleLabel(t: string) {
+  return vehicleTypeLabel(t);
+}
+
+function statusLabel(s: string) {
+  return s === 'pass' ? 'Pass' : s === 'fail' ? 'Fail' : s;
+}
+
+function formatDate(d: string | Date | null | undefined) {
+  if (!d) return '';
+  const date = typeof d === 'string' ? new Date(d) : d;
+  return date.toLocaleDateString('en-GB');
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
+  const user = await verifyAuth(req);
+  if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+  const { fleetId, dateStart, dateEnd } = req.query;
+  const sql = neon(process.env.DATABASE_URL!);
+
+  // Non-admins can only export their own fleet
+  let fleetIds: string[] = [];
+  if (user.role !== 'admin' && user.fleetId) {
+    fleetIds = [user.fleetId];
+  } else if (fleetId) {
+    fleetIds = (fleetId as string).split(',').map((s) => s.trim()).filter(Boolean);
+  }
+
+  try {
+    // Build dynamic WHERE for inspection-scoped queries
+    const inspectionConditions: string[] = ['il.company_id = $1'];
+    const inspectionParams: string[] = [user.companyId];
+
+    if (fleetIds.length === 1) {
+      inspectionParams.push(fleetIds[0]);
+      inspectionConditions.push(`il.fleet_id = $${inspectionParams.length}`);
+    } else if (fleetIds.length > 1) {
+      const placeholders = fleetIds.map((id) => {
+        inspectionParams.push(id);
+        return `$${inspectionParams.length}`;
+      }).join(',');
+      inspectionConditions.push(`il.fleet_id IN (${placeholders})`);
+    }
+    if (dateStart) {
+      inspectionParams.push(dateStart as string);
+      inspectionConditions.push(`il.inspection_date >= $${inspectionParams.length}::date`);
+    }
+    if (dateEnd) {
+      inspectionParams.push(dateEnd as string);
+      inspectionConditions.push(`il.inspection_date <= $${inspectionParams.length}::date`);
+    }
+    const inspectionWhere = inspectionConditions.length > 0
+      ? `WHERE ${inspectionConditions.join(' AND ')}`
+      : '';
+
+    // Aggregate fleet-level stats for the period
+    const fleetStatsQuery = `
+      SELECT
+        il.fleet_id,
+        COUNT(DISTINCT il.vehicle_id)::int AS vehicles_checked,
+        COUNT(*)::int                     AS inspections,
+        COUNT(*) FILTER (WHERE il.overall_status = 'pass')::int AS passed,
+        COUNT(*) FILTER (WHERE il.overall_status = 'fail')::int AS failed
+      FROM inspection_logs il
+      ${inspectionWhere}
+      GROUP BY il.fleet_id
+      ORDER BY il.fleet_id
+    `;
+    const fleetStats = await sql.query(fleetStatsQuery, inspectionParams) as Array<{
+      fleet_id: string;
+      vehicles_checked: number;
+      inspections: number;
+      passed: number;
+      failed: number;
+    }>;
+
+    // Fleet vehicle totals (scoped to selected fleets if provided)
+    const totalsConditions: string[] = ['company_id = $1'];
+    const totalsParams: string[] = [user.companyId];
+    if (fleetIds.length === 1) {
+      totalsParams.push(fleetIds[0]);
+      totalsConditions.push(`fleet_id = $${totalsParams.length}`);
+    } else if (fleetIds.length > 1) {
+      const placeholders = fleetIds.map((id) => {
+        totalsParams.push(id);
+        return `$${totalsParams.length}`;
+      }).join(',');
+      totalsConditions.push(`fleet_id IN (${placeholders})`);
+    }
+    const totalsWhere = totalsConditions.length > 0
+      ? `WHERE ${totalsConditions.join(' AND ')}`
+      : '';
+    const fleetTotalsQuery = `
+      SELECT fleet_id, COUNT(*)::int AS total
+      FROM vehicle_master
+      ${totalsWhere}
+      GROUP BY fleet_id
+      ORDER BY fleet_id
+    `;
+    const fleetTotals = await sql.query(fleetTotalsQuery, totalsParams) as Array<{
+      fleet_id: string;
+      total: number;
+    }>;
+    const totalMap = Object.fromEntries(fleetTotals.map((f) => [f.fleet_id, f.total]));
+
+    // Inspection detail rows (capped)
+    const detailQuery = `
+      SELECT
+        il.inspection_date,
+        il.fleet_id,
+        il.inspector_name,
+        il.overall_status,
+        il.frequency,
+        il.created_at,
+        vm.plate_number,
+        vm.vehicle_type
+      FROM inspection_logs il
+      JOIN vehicle_master vm ON vm.id = il.vehicle_id
+      ${inspectionWhere}
+      ORDER BY il.inspection_date DESC, il.created_at DESC
+      LIMIT 5000
+    `;
+    const details = await sql.query(detailQuery, inspectionParams) as Array<{
+      inspection_date: string;
+      fleet_id: string;
+      inspector_name: string | null;
+      overall_status: string;
+      frequency: string | null;
+      created_at: string;
+      plate_number: string;
+      vehicle_type: string;
+    }>;
+
+    // Totals across period
+    let totalInspections = 0;
+    let totalPassed = 0;
+    let totalFailed = 0;
+    let totalVehiclesChecked = 0;
+    for (const s of fleetStats) {
+      totalInspections += s.inspections;
+      totalPassed += s.passed;
+      totalFailed += s.failed;
+      totalVehiclesChecked += s.vehicles_checked;
+    }
+    const totalVehicles = fleetTotals.reduce((acc, f) => acc + f.total, 0);
+
+    /* ─────────── Build workbook ─────────── */
+    const wb = new ExcelJS.Workbook();
+    wb.creator = brand.appName;
+    wb.created = new Date();
+
+    const YELLOW = toArgb(brand.primary);
+    const RED    = toArgb(brand.accent);
+    const TEXT   = toArgb(brand.primaryText);
+    const GREEN  = 'FFE8F5E9';
+    const REDBG  = 'FFFCE4EC';
+
+    /* ─── Summary sheet ─── */
+    const sum = wb.addWorksheet('Summary', {
+      pageSetup: { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1 },
+    });
+    sum.columns = [{ width: 32 }, { width: 28 }];
+
+    const title = sum.addRow([`${brand.appName} — Dashboard Report`]);
+    title.font = { bold: true, size: 16, color: { argb: 'FF1A1A1A' } };
+    sum.mergeCells('A1:B1');
+    title.height = 26;
+
+    sum.addRow([]);
+
+    const filtersRows: [string, string][] = [
+      ['Generated', new Date().toLocaleString('en-GB')],
+      ['Fleets',   fleetIds.length > 0 ? fleetIds.join(', ') : 'All'],
+      ['From',     (dateStart as string) || 'All time'],
+      ['To',       (dateEnd as string)   || 'All time'],
+    ];
+    for (const [k, v] of filtersRows) {
+      const r = sum.addRow([k, v]);
+      r.getCell(1).font = { bold: true, color: { argb: 'FF555555' } };
+      r.getCell(2).alignment = { wrapText: true };
+    }
+
+    sum.addRow([]);
+    const statsHeader = sum.addRow(['Metric', 'Value']);
+    statsHeader.eachCell((cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: YELLOW } };
+      cell.font = { bold: true, color: { argb: TEXT } };
+      cell.border = { bottom: { style: 'medium', color: { argb: RED } } };
+    });
+
+    const passRate = totalInspections > 0
+      ? `${Math.round((totalPassed / totalInspections) * 100)}%`
+      : '—';
+
+    const metrics: [string, string | number][] = [
+      ['Total vehicles in scope', totalVehicles],
+      ['Unique vehicles inspected', totalVehiclesChecked],
+      ['Total inspections', totalInspections],
+      ['Passed', totalPassed],
+      ['Failed', totalFailed],
+      ['Pass rate', passRate],
+    ];
+    for (const [k, v] of metrics) {
+      const r = sum.addRow([k, v]);
+      r.getCell(1).font = { size: 11 };
+      r.getCell(2).font = { size: 11, bold: true };
+      if (k === 'Passed') r.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: GREEN } };
+      if (k === 'Failed') r.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: REDBG } };
+    }
+
+    /* ─── Fleet breakdown sheet ─── */
+    const fleetSheet = wb.addWorksheet('By Fleet', {
+      pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1 },
+    });
+    fleetSheet.columns = [
+      { header: 'Fleet',         key: 'fleet',    width: 14 },
+      { header: 'Vehicles',      key: 'vehicles', width: 12 },
+      { header: 'Inspected',     key: 'checked',  width: 12 },
+      { header: 'Inspections',   key: 'total',    width: 14 },
+      { header: 'Passed',        key: 'passed',   width: 12 },
+      { header: 'Failed',        key: 'failed',   width: 12 },
+      { header: 'Pass Rate',     key: 'rate',     width: 12 },
+    ];
+    const fleetHeader = fleetSheet.getRow(1);
+    fleetHeader.height = 22;
+    fleetHeader.eachCell((cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: YELLOW } };
+      cell.font = { bold: true, size: 10, color: { argb: TEXT } };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      cell.border = { bottom: { style: 'medium', color: { argb: RED } } };
+    });
+
+    // Build the union of fleet_ids we need to display
+    const displayFleets = new Set<string>([
+      ...fleetStats.map((s) => s.fleet_id),
+      ...fleetTotals.map((f) => f.fleet_id),
+    ]);
+    const sortedFleets = Array.from(displayFleets).sort();
+    const statsMap = Object.fromEntries(fleetStats.map((s) => [s.fleet_id, s]));
+
+    sortedFleets.forEach((fid, i) => {
+      const s = statsMap[fid];
+      const insp = s?.inspections ?? 0;
+      const passed = s?.passed ?? 0;
+      const failed = s?.failed ?? 0;
+      const checked = s?.vehicles_checked ?? 0;
+      const rate = insp > 0 ? `${Math.round((passed / insp) * 100)}%` : '—';
+
+      const row = fleetSheet.addRow({
+        fleet:    fid,
+        vehicles: totalMap[fid] ?? 0,
+        checked,
+        total:    insp,
+        passed,
+        failed,
+        rate,
+      });
+      const rowBg = i % 2 === 0 ? 'FFFFFFFF' : 'FFFAFAFA';
+      row.eachCell((cell) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
+        cell.font = { size: 10 };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.border = { bottom: { style: 'thin', color: { argb: 'FFE0E0E0' } } };
+      });
+      if (failed > 0) {
+        row.getCell('failed').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: REDBG } };
+        row.getCell('failed').font = { size: 10, bold: true };
+      }
+    });
+
+    // Totals row
+    const totalRow = fleetSheet.addRow({
+      fleet:    'TOTAL',
+      vehicles: totalVehicles,
+      checked:  totalVehiclesChecked,
+      total:    totalInspections,
+      passed:   totalPassed,
+      failed:   totalFailed,
+      rate:     passRate,
+    });
+    totalRow.eachCell((cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: YELLOW } };
+      cell.font = { size: 10, bold: true };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      cell.border = { top: { style: 'medium', color: { argb: RED } } };
+    });
+
+    fleetSheet.views = [{ state: 'frozen', ySplit: 1 }];
+    fleetSheet.autoFilter = { from: 'A1', to: 'G1' };
+
+    /* ─── Inspections detail sheet ─── */
+    const detail = wb.addWorksheet('Inspections', {
+      pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1 },
+    });
+    detail.columns = [
+      { header: '#',               key: 'num',       width: 5  },
+      { header: 'Date',            key: 'date',      width: 13 },
+      { header: 'Plate Number',    key: 'plate',     width: 14 },
+      { header: 'Fleet',           key: 'fleet',     width: 12 },
+      { header: 'Vehicle Type',    key: 'vtype',     width: 14 },
+      { header: 'Frequency',       key: 'frequency', width: 12 },
+      { header: 'Inspector',       key: 'inspector', width: 22 },
+      { header: 'Status',          key: 'status',    width: 10 },
+      { header: 'Logged At',       key: 'created',   width: 16 },
+    ];
+    const detailHeader = detail.getRow(1);
+    detailHeader.height = 22;
+    detailHeader.eachCell((cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: YELLOW } };
+      cell.font = { bold: true, size: 10, color: { argb: TEXT } };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      cell.border = { bottom: { style: 'medium', color: { argb: RED } } };
+    });
+
+    details.forEach((row, i) => {
+      const r = detail.addRow({
+        num:       i + 1,
+        date:      formatDate(row.inspection_date),
+        plate:     row.plate_number,
+        fleet:     row.fleet_id,
+        vtype:     vehicleLabel(row.vehicle_type),
+        frequency: row.frequency || 'daily',
+        inspector: row.inspector_name || '',
+        status:    statusLabel(row.overall_status),
+        created:   new Date(row.created_at).toLocaleString('en-GB'),
+      });
+      const rowBg = i % 2 === 0 ? 'FFFFFFFF' : 'FFFAFAFA';
+      r.eachCell((cell) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
+        cell.font = { size: 10 };
+        cell.alignment = { vertical: 'middle' };
+        cell.border = { bottom: { style: 'thin', color: { argb: 'FFE0E0E0' } } };
+      });
+      if (row.overall_status === 'fail') {
+        r.getCell('status').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: REDBG } };
+        r.getCell('status').font = { size: 10, bold: true };
+      } else if (row.overall_status === 'pass') {
+        r.getCell('status').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: GREEN } };
+      }
+    });
+
+    if (details.length === 0) {
+      const empty = detail.addRow({ num: '', date: 'No inspections in this period.' });
+      detail.mergeCells(`B${empty.number}:I${empty.number}`);
+      empty.getCell('date').alignment = { horizontal: 'center' };
+      empty.getCell('date').font = { italic: true, color: { argb: 'FF888888' } };
+    }
+
+    detail.views = [{ state: 'frozen', ySplit: 1 }];
+    detail.autoFilter = { from: 'A1', to: 'I1' };
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const today = new Date().toISOString().slice(0, 10);
+    const filename = `${brand.fileSlug}-dashboard-${today}.xlsx`;
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', String(Buffer.from(buffer).byteLength));
+    res.status(200).end(Buffer.from(buffer));
+  } catch (error: any) {
+    console.error('[API] Dashboard export error:', error.message);
+    res.status(500).json({ error: 'Export failed' });
+  }
+}

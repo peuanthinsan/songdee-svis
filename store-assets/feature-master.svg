@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500" role="img" aria-label="SVIS feature graphic">
+  <rect width="1024" height="500" fill="#06264B"/>
+  <circle cx="808" cy="70" r="250" fill="#0A3A6D"/>
+  <path fill="#E31B23" d="M130 82c-46 0-84 38-84 84 0 60 72 112 75 114a17 17 0 0 0 19 0c3-2 74-54 74-114 0-46-37-84-84-84Z"/>
+  <circle cx="130" cy="164" r="57" fill="#fff"/>
+  <path fill="#7A1424" d="M89 130h82v24h-46l46 31v55H89v-24h46l-46-31v-55Zm25 24v20l34 24v-20l-34-24Z"/>
+  <text x="265" y="193" font-family="Arial,sans-serif" font-size="112" font-weight="800" letter-spacing="12" fill="#fff">SVIS</text>
+  <text x="64" y="346" font-family="Arial,sans-serif" font-size="34" font-weight="700" letter-spacing="1" fill="#00A6C8">SONGDEE VEHICLE INSPECTION SYSTEM</text>
+  <text x="66" y="397" font-family="Arial,sans-serif" font-size="24" font-weight="500" fill="#C7D9EA">Safer fleets. Clearer inspections. Every company.</text>
+  <g transform="translate(778 242)">
+    <path d="M0 70h126l45 48v72H0Z" fill="#fff"/>
+    <path d="M128 82h39l36 42h-75Z" fill="#BCECF5"/>
+    <rect x="22" y="94" width="92" height="23" rx="8" fill="#00A6C8"/>
+    <circle cx="44" cy="188" r="28" fill="#031A34"/><circle cx="44" cy="188" r="11" fill="#fff"/>
+    <circle cx="158" cy="188" r="28" fill="#031A34"/><circle cx="158" cy="188" r="11" fill="#fff"/>
+    <path d="m74 43 22 22 43-50" fill="none" stroke="#7CB342" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

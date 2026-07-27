@@ -1,0 +1,1 @@
+ALTER TABLE inspection_logs ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT '';
