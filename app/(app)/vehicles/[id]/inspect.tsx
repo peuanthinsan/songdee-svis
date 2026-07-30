@@ -69,7 +69,7 @@ export default function InspectScreen() {
   const [checklistError, setChecklistError] = useState(false);
   const [diagramVisible, setDiagramVisible] = useState(true);
 
-  const failCount = Object.values(results).filter(r => r === 'fail').length;
+  const failCount = checklistItems.filter(ci => results[ci.id] === 'fail').length;
   const hasFailures = failCount > 0;
   const allItemsAnswered = checklistItems.length > 0 && checklistItems.every(it => results[it.id] === 'pass' || results[it.id] === 'fail');
   const mileageValid = /^\d+$/.test(mileage.trim()) && parseInt(mileage.trim(), 10) >= 0;
