@@ -1,6 +1,13 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { API_BASE, setOnUnauthorized } from './api';
+import {
+  AUTH_TOKEN_KEY,
+  AUTH_USER_KEY,
+  clearAuthStorage,
+  readAuthToken,
+  readAuthUser,
+} from './auth-storage';
 
 export type UserRole = 'driver' | 'supervisor' | 'admin';
 
@@ -30,8 +37,6 @@ type AuthContextType = {
 const AuthCtx = createContext<AuthContextType | null>(null);
 
 const TOKEN_REFRESH_INTERVAL = 12 * 60 * 60 * 1000; // 12 hours
-const TOKEN_KEY = 'svis_auth_token';
-const USER_KEY = 'svis_auth_user';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -42,10 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     setToken(null);
     setUser(null);
-    await SecureStore.deleteItemAsync(TOKEN_KEY);
-    await SecureStore.deleteItemAsync(USER_KEY);
-    await SecureStore.deleteItemAsync('auth_token');
-    await SecureStore.deleteItemAsync('auth_user');
+    await clearAuthStorage();
     if (refreshTimerRef.current) {
       clearInterval(refreshTimerRef.current);
       refreshTimerRef.current = null;
@@ -69,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (res.ok) {
         const data = await res.json();
         setToken(data.token);
-        await SecureStore.setItemAsync(TOKEN_KEY, data.token);
+        await SecureStore.setItemAsync(AUTH_TOKEN_KEY, data.token);
         return data.token;
       }
       // Token expired beyond refresh window — sign out
@@ -85,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const startRefreshTimer = useCallback((currentToken: string) => {
     if (refreshTimerRef.current) clearInterval(refreshTimerRef.current);
     refreshTimerRef.current = setInterval(async () => {
-      const savedToken = await SecureStore.getItemAsync(TOKEN_KEY);
+      const savedToken = await readAuthToken();
       if (savedToken) refreshToken(savedToken);
     }, TOKEN_REFRESH_INTERVAL);
   }, [refreshToken]);
@@ -94,8 +96,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
-        const savedToken = await SecureStore.getItemAsync(TOKEN_KEY);
-        const savedUser = await SecureStore.getItemAsync(USER_KEY);
+        const [savedToken, savedUser] = await Promise.all([
+          readAuthToken(),
+          readAuthUser(),
+        ]);
         if (savedToken && savedUser) {
           const parsedUser = JSON.parse(savedUser) as AuthUser;
           if (parsedUser.companyId) {
@@ -130,8 +134,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data = await res.json();
     setToken(data.token);
     setUser(data.user);
-    await SecureStore.setItemAsync(TOKEN_KEY, data.token);
-    await SecureStore.setItemAsync(USER_KEY, JSON.stringify(data.user));
+    await SecureStore.setItemAsync(AUTH_TOKEN_KEY, data.token);
+    await SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(data.user));
     startRefreshTimer(data.token);
   }, [startRefreshTimer]);
 
@@ -169,7 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const updated = await res.json();
     const newUser = { ...user!, firstName: updated.firstName, lastName: updated.lastName };
     setUser(newUser);
-    await SecureStore.setItemAsync(USER_KEY, JSON.stringify(newUser));
+    await SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(newUser));
   }, [token, user]);
 
   return (
