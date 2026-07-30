@@ -18,6 +18,7 @@ function pct(checked: number, total: number): number {
 }
 
 type VehicleRef = { vehicle_id: string; vehicle_type: TypeKey };
+type ScopedVehicleRef = VehicleRef & { fleet_id: string };
 
 /** Count vehicles per type, keeping each vehicle once. */
 function countByType(refs: Iterable<VehicleRef>): Record<TypeKey, number> {
@@ -50,10 +51,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!isAdmin && !fleet) return res.status(403).json({ error: 'Forbidden' });
 
   try {
+    let telematicsUnavailable = false;
     const [vehicleRows, inspectedRows, weeklyInspectedRows, oosRows, issueCount, defectRows, fleetTotals, fleetChecked, sheetVehicles] = await Promise.all([
       // All vehicles in scope (composition + plate matching against the GPS sheet).
       sql`
-        SELECT id, plate_number, vehicle_type
+        SELECT id, plate_number, vehicle_type, fleet_id
         FROM vehicle_master
         WHERE company_id = ${user.companyId}
           AND (${fleet}::text IS NULL OR fleet_id = ${fleet})
@@ -144,6 +146,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `,
       // Telematics snapshot (null = sheet not configured; degrade to fleet-size denominators).
       fetchSheetVehicles(sql, user.companyId).catch((err): SheetVehicle[] | null => {
+        telematicsUnavailable = true;
         console.warn('[dashboard] GPS sheet unavailable:', err.message);
         return null;
       }),
@@ -151,10 +154,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Composition + total fleet size.
     const byType = emptyTypes();
-    const vehicleByPlate = new Map<string, VehicleRef>();
+    const vehicleByPlate = new Map<string, ScopedVehicleRef>();
     for (const r of vehicleRows as any[]) {
       byType[r.vehicle_type as TypeKey] += 1;
-      vehicleByPlate.set(r.plate_number, { vehicle_id: r.id, vehicle_type: r.vehicle_type });
+      vehicleByPlate.set(r.plate_number, {
+        vehicle_id: r.id,
+        vehicle_type: r.vehicle_type,
+        fleet_id: r.fleet_id,
+      });
     }
     const totalVehicles = sumTypes(byType);
 
@@ -175,19 +182,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       activeTodayByType = countByType(activeRefs);
       activeTodayIds = new Set(activeRefs.map(r => r.vehicle_id));
 
-      // Persist today's activity, then read back the week's distinct active vehicles.
-      await recordVehicleActivity(sql, sheetVehicles!, today, user.companyId);
-      const weeklyActiveRows = await sql`
-        SELECT DISTINCT a.vehicle_id, v.vehicle_type
-        FROM vehicle_activity_log a
-        JOIN vehicle_master v ON v.id = a.vehicle_id
-        WHERE a.activity_date >= ${monday}
-          AND a.activity_date <= ${today}
-          AND a.company_id = ${user.companyId}
-          AND (${fleet}::text IS NULL OR v.fleet_id = ${fleet})
-      `;
-      weeklyActiveByType = countByType(weeklyActiveRows as VehicleRef[]);
-      weeklyActiveIds = new Set((weeklyActiveRows as VehicleRef[]).map(r => r.vehicle_id));
+      // Persist today's snapshot while reading the week's activity. Unioning the
+      // current refs makes the result correct even if the read wins the race.
+      const [weeklyActiveRows] = await Promise.all([
+        sql`
+          SELECT DISTINCT a.vehicle_id, v.vehicle_type
+          FROM vehicle_activity_log a
+          JOIN vehicle_master v ON v.id = a.vehicle_id
+          WHERE a.activity_date >= ${monday}
+            AND a.activity_date <= ${today}
+            AND a.company_id = ${user.companyId}
+            AND (${fleet}::text IS NULL OR v.fleet_id = ${fleet})
+        `,
+        recordVehicleActivity(sql, sheetVehicles!, today, user.companyId),
+      ]);
+      const weeklyActivityRefs = [...weeklyActiveRows as VehicleRef[], ...activeRefs];
+      weeklyActiveByType = countByType(weeklyActivityRefs);
+      weeklyActiveIds = new Set(weeklyActivityRefs.map(r => r.vehicle_id));
     }
 
     // Completion numerators: inspected vehicles, restricted to the Active set when
@@ -203,6 +214,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const dailyByType = countByType(restrict(dailyRefs, activeTodayIds));
     const postRouteByType = countByType(restrict(postRouteRefs, activeTodayIds));
     const weeklyByType = countByType(restrict(weeklyRefs, weeklyActiveIds));
+
+    // Reuse this same telematics snapshot for the GPS counters/table so a fleet
+    // switch performs one sheet download and returns one internally consistent view.
+    const dailyIds = new Set(dailyRefs.map((r) => r.vehicle_id));
+    const postRouteIds = new Set(postRouteRefs.map((r) => r.vehicle_id));
+    const weeklyIds = new Set(weeklyRefs.map((r) => r.vehicle_id));
+    const unitVehicles = sheetVehicles?.flatMap((v) => {
+      const ref = vehicleByPlate.get(v.plateNumber);
+      if (!ref) return [];
+      const inspections = {
+        preRoute: dailyIds.has(ref.vehicle_id),
+        postRoute: postRouteIds.has(ref.vehicle_id),
+        weekly: weeklyIds.has(ref.vehicle_id),
+      };
+      const isGpsActive = v.gpsStatus !== 'offline';
+      return [{
+        ...v,
+        fleet: ref.fleet_id,
+        inspections,
+        needsAttention: isGpsActive &&
+          !(inspections.preRoute && inspections.postRoute && inspections.weekly),
+      }];
+    }) ?? [];
+    const unitStatus = sheetVehicles === null
+      ? telematicsUnavailable
+        ? null
+        : { configured: false, vehicles: [] }
+      : {
+          configured: true,
+          date: today,
+          vehicles: unitVehicles,
+          summary: {
+            total: unitVehicles.length,
+            running: unitVehicles.filter((v) => v.gpsStatus === 'running').length,
+            stopped: unitVehicles.filter((v) => v.gpsStatus === 'stopped').length,
+            offline: unitVehicles.filter((v) => v.gpsStatus === 'offline').length,
+            needsAttention: unitVehicles.filter((v) => v.needsAttention).length,
+          },
+        };
 
     const oosTotal = (oosRows as any[])[0]?.total ?? 0;
     const oosToday = (oosRows as any[])[0]?.today ?? 0;
@@ -244,6 +294,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       totalVehicles,
       byType,
       telematics,
+      unitStatus,
       active: {
         checked: activeCount,
         total: totalVehicles,

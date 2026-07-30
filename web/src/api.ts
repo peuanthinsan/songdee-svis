@@ -128,6 +128,8 @@ export type DashboardData = {
   byType: TypeBreakdown;
   /** True when the GPS sheet is configured, i.e. Active/denominators are telematics-based. */
   telematics: boolean;
+  /** GPS counters and rows from the same scoped telematics snapshot as the metrics. */
+  unitStatus: UnitStatusData | null;
   active: CompletionStat;
   preDeparture: CompletionStat;
   postRoute: CompletionStat;
@@ -185,9 +187,9 @@ export function login(username: string, password: string, companySlug = 'dhl') {
   });
 }
 
-export function fetchDashboard(fleetId?: string) {
+export function fetchDashboard(fleetId?: string, signal?: AbortSignal) {
   const qs = fleetId ? `?fleetId=${encodeURIComponent(fleetId)}` : '';
-  return apiFetch<DashboardData>(`/api/dashboard${qs}`);
+  return apiFetch<DashboardData>(`/api/dashboard${qs}`, { signal });
 }
 
 export function fetchHistory(startDate: string, endDate: string, fleetId?: string) {
@@ -248,8 +250,9 @@ export type UnitStatusData = {
   };
 };
 
-export function fetchUnitStatus() {
-  return apiFetch<UnitStatusData>('/api/unit-status');
+export function fetchUnitStatus(fleetId?: string) {
+  const qs = fleetId ? `?fleetId=${encodeURIComponent(fleetId)}` : '';
+  return apiFetch<UnitStatusData>(`/api/unit-status${qs}`);
 }
 
 // ─── Preventive Maintenance ──────────────────────────────────────────────────
@@ -294,9 +297,9 @@ export type MaintenanceData = {
   };
 };
 
-export function fetchMaintenance(fleetId?: string) {
+export function fetchMaintenance(fleetId?: string, signal?: AbortSignal) {
   const qs = fleetId ? `?fleetId=${encodeURIComponent(fleetId)}` : '';
-  return apiFetch<MaintenanceData>(`/api/maintenance${qs}`);
+  return apiFetch<MaintenanceData>(`/api/maintenance${qs}`, { signal });
 }
 
 export function saveMaintenance(data: {

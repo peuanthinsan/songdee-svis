@@ -4,7 +4,6 @@ import {
   downloadExport,
   fetchDashboard,
   fetchMaintenance,
-  fetchUnitStatus,
   notifyVendor,
   type CompletionStat,
   type DashboardData,
@@ -321,7 +320,6 @@ export function DashboardPage() {
   const { user, isDashboardUser } = useAuth();
   const isAdmin = user?.role === 'admin';
   const [data, setData] = useState<DashboardData | null>(null);
-  const [unitData, setUnitData] = useState<UnitStatusData | null>(null);
   const [maintData, setMaintData] = useState<MaintenanceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -336,25 +334,32 @@ export function DashboardPage() {
   // Monotonic guard so only the latest load() applies its results: drops out-of-order
   // 60s-poll/fleet-switch responses and post-unmount state writes (last-resolved-wins bug).
   const loadGenRef = useRef(0);
+  const loadAbortRef = useRef<AbortController | null>(null);
 
   const load = useCallback(async () => {
     const myGen = ++loadGenRef.current;
+    loadAbortRef.current?.abort();
+    const controller = new AbortController();
+    loadAbortRef.current = controller;
     setError(null);
+    const maintenanceRequest = fetchMaintenance(fleetScope, controller.signal).catch(() => null);
     try {
-      const [result, unit, maint] = await Promise.all([
-        fetchDashboard(fleetScope),
-        fetchUnitStatus().catch(() => null),
-        fetchMaintenance(fleetScope).catch(() => null),
-      ]);
+      const result = await fetchDashboard(fleetScope, controller.signal);
       if (loadGenRef.current !== myGen) return;
       setData(result);
-      setUnitData(unit);
-      setMaintData(maint);
       // Capture the full fleet list from an unscoped admin load to populate the filter dropdown.
       if (isAdmin && !fleetScope) {
         setAllFleets(result.fleets.map((f) => f.fleetId));
       }
-    } catch {
+      // The core metrics and GPS table are coherent in `result`; do not make the
+      // user wait for the optional maintenance calculation before showing them.
+      setLoading(false);
+
+      const maint = await maintenanceRequest;
+      if (loadGenRef.current !== myGen) return;
+      setMaintData(maint);
+    } catch (err) {
+      if ((err as Error).name === 'AbortError') return;
       if (loadGenRef.current !== myGen) return;
       setError(t('error'));
     } finally {
@@ -367,6 +372,7 @@ export function DashboardPage() {
     const id = window.setInterval(load, 60_000);
     return () => {
       window.clearInterval(id);
+      loadAbortRef.current?.abort();
       loadGenRef.current++; // invalidate any in-flight load on unmount / dependency change
     };
   }, [load]);
@@ -399,7 +405,7 @@ export function DashboardPage() {
     }
   }
 
-  if (loading) return <div className="panel centered">{t('signingIn')}</div>;
+  if (loading) return <div className="panel centered">{t('loading')}</div>;
   if (error) {
     return (
       <div className="panel centered">
@@ -426,7 +432,11 @@ export function DashboardPage() {
             <select
               className="fleet-select"
               value={selectedFleet ?? ''}
-              onChange={(e) => setSelectedFleet(e.target.value || undefined)}
+              onChange={(e) => {
+                setLoading(true);
+                setMaintData(null);
+                setSelectedFleet(e.target.value || undefined);
+              }}
               aria-label={t('fleet')}
             >
               <option value="">{t('allFleets')}</option>
@@ -502,7 +512,7 @@ export function DashboardPage() {
         </section>
       </div>
 
-      {unitData && <UnitStatusSection unitData={unitData} />}
+      {data.unitStatus && <UnitStatusSection unitData={data.unitStatus} />}
 
       {maintData && <MaintenanceSection maintData={maintData} />}
     </div>

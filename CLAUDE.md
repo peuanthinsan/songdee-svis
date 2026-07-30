@@ -112,9 +112,9 @@ Full metric-by-metric formulas (numerators, denominators, edge cases) live in
   GPS-active vehicle to have completed daily, post-route, *and* weekly inspections to clear
   — not the same UI concept as the per-column "รอตรวจ"/Pending cell shown inside individual
   Pre-Route/Post-Route/Weekly columns.
-- **Role-scoped needsAttention**: the `needsAttention` computation itself matches purely by
-  plate number across *all* fleets (no `fleet_id` join); it's scoped to the caller's fleet
-  only at the final display step (non-admins locked to `user.fleetId`).
+- **Role-scoped needsAttention**: GPS rows are matched by plate to active `vehicle_master`
+  rows inside the JWT company and effective fleet before `needsAttention` is computed.
+  Database fleet membership is authoritative; non-admins are locked to `user.fleetId`.
 - **Preventive maintenance** (Admin → Maintenance, `api/maintenance.ts`): engine check-up
   every 10,000 km; tires every 40,000 km (metro) / 30,000 km (provincial) OR 24 months,
   whichever comes first; battery every 18 months. Mileage projections use only

@@ -37,6 +37,28 @@ export function parseGpsStatus(raw: string): GpsStatus {
   return 'offline';
 }
 
+const GPS_STATUS_PRIORITY: Record<GpsStatus, number> = {
+  offline: 0,
+  stopped: 1,
+  running: 2,
+};
+
+/**
+ * Keep one deterministic row per plate before any dashboard calculation.
+ * If a sheet contains conflicting duplicates, prefer the most active status so
+ * Active metrics, activity logging, and the GPS table all use the same snapshot.
+ */
+function dedupeVehicles(vehicles: SheetVehicle[]): SheetVehicle[] {
+  const byPlate = new Map<string, SheetVehicle>();
+  for (const vehicle of vehicles) {
+    const current = byPlate.get(vehicle.plateNumber);
+    if (!current || GPS_STATUS_PRIORITY[vehicle.gpsStatus] > GPS_STATUS_PRIORITY[current.gpsStatus]) {
+      byPlate.set(vehicle.plateNumber, vehicle);
+    }
+  }
+  return [...byPlate.values()];
+}
+
 async function fetchSheetCsv(csvUrl: string): Promise<string> {
   const res = await fetch(csvUrl, { redirect: 'follow' });
   if (!res.ok) throw new Error(`Sheet fetch failed: ${res.status}`);
@@ -72,7 +94,7 @@ export async function fetchSheetVehicles(sql: NeonSql, companyId: string): Promi
   if (!csvUrl) throw new Error('Invalid Google Sheets URL');
 
   const rows = parseCsv(await fetchSheetCsv(csvUrl));
-  return rows
+  return dedupeVehicles(rows
     .filter(r => r.VehicleNo)
     .map(r => ({
       plateNumber: r.VehicleNo.trim(),
@@ -83,7 +105,7 @@ export async function fetchSheetVehicles(sql: NeonSql, companyId: string): Promi
       speed: parseFloat(r.Speed ?? '0') || 0,
       lastFixTime: r.LastFixTime ?? '',
       updatedAt: r.UpdatedAt ?? '',
-    }));
+    })));
 }
 
 /**
