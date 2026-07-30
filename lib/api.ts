@@ -1,10 +1,10 @@
 import { Platform } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
+import { readAuthToken } from './auth-storage';
 
 export const API_BASE = (
   process.env.EXPO_PUBLIC_API_URL
   ?? (Platform.OS === 'android' ? 'http://10.0.2.2:3000' : 'http://localhost:3000')
-).trim();
+).trim().replace(/\/+$/, '');
 
 // Sign-out callback — set by AuthProvider so apiFetch can trigger sign-out on 401
 let onUnauthorized: (() => void) | null = null;
@@ -13,7 +13,7 @@ export function setOnUnauthorized(cb: () => void) {
 }
 
 export async function getAuthToken(): Promise<string | null> {
-  return SecureStore.getItemAsync('auth_token');
+  return readAuthToken();
 }
 
 export async function apiFetch(path: string, options?: RequestInit & { timeout?: number }) {
@@ -21,7 +21,7 @@ export async function apiFetch(path: string, options?: RequestInit & { timeout?:
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-  const token = await SecureStore.getItemAsync('auth_token');
+  const token = await readAuthToken();
 
   try {
     const res = await fetch(`${API_BASE}${path}`, {

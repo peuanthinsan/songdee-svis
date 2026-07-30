@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -30,6 +30,10 @@ type Vehicle = {
   fleet_manager_email: string;
 };
 
+type FleetSummary = {
+  fleet_id: string;
+};
+
 type FormState = {
   plate_number: string;
   vehicle_type: VehicleType;
@@ -52,6 +56,14 @@ const EMPTY_FORM: FormState = {
   fleet_manager_email: '',
 };
 
+function mergeVehiclesById(current: Vehicle[], incoming: Vehicle[]): Vehicle[] {
+  const vehiclesById = new Map(current.map((vehicle) => [vehicle.id, vehicle]));
+  for (const vehicle of incoming) {
+    vehiclesById.set(vehicle.id, vehicle);
+  }
+  return [...vehiclesById.values()];
+}
+
 export default function AdminVehiclesScreen() {
   const { t } = useI18n();
   const navigation = useNavigation();
@@ -64,24 +76,51 @@ export default function AdminVehiclesScreen() {
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const offsetRef = useRef(0);
+  const requestGenerationRef = useRef(0);
+  const fleetRequestGenerationRef = useRef(0);
+  const resetInFlightRef = useRef(false);
+  const loadMoreInFlightRef = useRef(false);
+  const [reloadVersion, setReloadVersion] = useState(0);
 
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 300);
   const [selectedFleet, setSelectedFleet] = useState<string | null>(null);
+  const [fleetIds, setFleetIds] = useState<string[]>([]);
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
 
-  // Derive fleet list from vehicles data
-  const fleetIds = useMemo(
-    () => [...new Set(vehicles.map((v) => v.fleet_id).filter(Boolean))].sort(),
-    [vehicles]
-  );
-
   const PAGE_LIMIT = 100;
 
+  const fetchFleetIds = useCallback(async () => {
+    const requestGeneration = ++fleetRequestGenerationRef.current;
+    try {
+      const data = await apiFetch('/api/admin/fleets');
+      const fleets: FleetSummary[] = data.fleets ?? data ?? [];
+      if (requestGeneration !== fleetRequestGenerationRef.current) return;
+      setFleetIds(
+        [...new Set(fleets.map((fleet) => fleet.fleet_id).filter(Boolean))].sort()
+      );
+    } catch {
+      // Vehicle rows still contribute fleet IDs below if this metadata request fails.
+    }
+  }, []);
+
   const fetchVehicles = useCallback(async (reset = false) => {
+    if (!reset && (resetInFlightRef.current || loadMoreInFlightRef.current)) return;
+
+    const requestGeneration = reset
+      ? ++requestGenerationRef.current
+      : requestGenerationRef.current;
+
+    if (reset) {
+      resetInFlightRef.current = true;
+    } else {
+      loadMoreInFlightRef.current = true;
+      setLoadingMore(true);
+    }
+
     try {
       setError(null);
       const currentOffset = reset ? 0 : offsetRef.current;
@@ -92,28 +131,52 @@ export default function AdminVehiclesScreen() {
       if (selectedFleet) params.set('fleetId', selectedFleet);
       const data = await apiFetch(`/api/admin/vehicles?${params.toString()}`);
       const fetched: Vehicle[] = data.vehicles ?? data ?? [];
+      if (requestGeneration !== requestGenerationRef.current) return;
+
+      setFleetIds((current) => (
+        [...new Set([
+          ...current,
+          ...fetched.map((vehicle) => vehicle.fleet_id).filter(Boolean),
+        ])].sort()
+      ));
+
       if (reset) {
-        setVehicles(fetched);
+        setVehicles(mergeVehiclesById([], fetched));
         offsetRef.current = fetched.length;
       } else {
-        setVehicles((prev) => [...prev, ...fetched]);
+        setVehicles((current) => mergeVehiclesById(current, fetched));
         offsetRef.current = currentOffset + fetched.length;
       }
       setHasMore(fetched.length >= PAGE_LIMIT);
     } catch (err: any) {
-      setError(err.message || t('general.error'));
+      if (requestGeneration === requestGenerationRef.current) {
+        setError(err.message || t('general.error'));
+      }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
-      setLoadingMore(false);
+      if (!reset) loadMoreInFlightRef.current = false;
+      if (requestGeneration === requestGenerationRef.current) {
+        if (reset) resetInFlightRef.current = false;
+        setLoading(false);
+        setRefreshing(false);
+        setLoadingMore(false);
+      }
     }
   }, [debouncedSearch, selectedFleet]);
 
   const loadMore = () => {
-    if (!hasMore || loading || loadingMore) return;
-    setLoadingMore(true);
-    fetchVehicles(false);
+    if (
+      !hasMore
+      || loading
+      || loadingMore
+      || resetInFlightRef.current
+      || loadMoreInFlightRef.current
+    ) return;
+    void fetchVehicles(false);
   };
+
+  useEffect(() => {
+    void fetchFleetIds();
+  }, [fetchFleetIds]);
 
   // Refetch when fleet filter or search changes
   useEffect(() => {
@@ -121,8 +184,8 @@ export default function AdminVehiclesScreen() {
     offsetRef.current = 0;
     setHasMore(true);
     setLoading(true);
-    fetchVehicles(true);
-  }, [selectedFleet, debouncedSearch]);
+    void fetchVehicles(true);
+  }, [fetchVehicles, reloadVersion]);
 
   // Set header add button
   useEffect(() => {
@@ -144,7 +207,8 @@ export default function AdminVehiclesScreen() {
     setVehicles([]);
     offsetRef.current = 0;
     setHasMore(true);
-    fetchVehicles(true);
+    void fetchFleetIds();
+    void fetchVehicles(true);
   };
 
   const openAddModal = () => {
@@ -203,7 +267,8 @@ export default function AdminVehiclesScreen() {
       }
       closeModal();
       setLoading(true);
-      fetchVehicles();
+      setReloadVersion((current) => current + 1);
+      void fetchFleetIds();
     } catch (err: any) {
       if (err.message?.includes('already exists') || err.message?.includes('Plate number')) {
         Alert.alert('', t('admin.vehicles.duplicatePlate') || 'Plate number already exists');
@@ -229,7 +294,8 @@ export default function AdminVehiclesScreen() {
               await apiFetch(`/api/admin/vehicles/${vehicle.id}`, { method: 'DELETE' });
               Alert.alert('', t('admin.vehicles.deleted'));
               setLoading(true);
-              fetchVehicles(true);
+              setReloadVersion((current) => current + 1);
+              void fetchFleetIds();
             } catch (err: any) {
               if (err.message && (err.message.includes('inspection') || err.message.includes('Cannot delete'))) {
                 Alert.alert(t('general.error'), t('admin.vehicles.hasInspections'));
