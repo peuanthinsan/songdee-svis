@@ -17,7 +17,7 @@ See `Specification.md` for the full SRS.
 - **Auth**: Custom company/username/password — bcrypt (12 rounds) hashed in the `users` table; JWT (`jsonwebtoken`, 7d expiry) signed with `JWT_SECRET`. Company + role + fleet are signed into each session.
 - **DB Auth**: Per-request Postgres session settings (`app.user_company_id`, `app.user_role`, `app.user_fleet_id`) set in `lib/db.ts#createDbClient()`; RLS policies read these via `current_setting(...)`
 - **Photo Storage**: Vercel Blob (defect photos, before/after repair)
-- **Email**: SendGrid via `@sendgrid/mail` (auto-notify fleet managers on inspection fail; the `resend` package in package.json is dead-dependency drift)
+- **Email**: SendGrid via `@sendgrid/mail` (auto-notify fleet managers on inspection fail); the `resend` package was removed from package.json
 - **API**: Vercel Functions
 
 ## Running DB scripts — read this before any migration or seed
@@ -65,6 +65,14 @@ database**, not "migration pending". New write scripts must call `requireConfirm
   Production ships via `vercel deploy --prod` on request; mobile (Expo/EAS) releases
   are the user's call only.
 - **Models:** plan on Fable/Opus; code with Codex by default (codex-delegation skill — Codex prompts must forbid git); review/verify/git on Fable/Opus.
+
+## Codex Delegation
+
+Codex implements features via `codex-delegation` / `codex-build` skills:
+- **Codex profiles:** light (Luna/medium) for mechanical work, build (Terra/high) for features/tests/debugging
+- **No git access:** Codex receives all edits via Write/Edit tools only; never runs `git commit`, `git push`, or git state changes
+- **Staging/commit by Haiku root:** after Codex completes and passes review, the Haiku root stages/commits explicitly by pathspec
+- **Max 2 fix rounds:** after two focused fix rounds in same thread, escalate to `deep` (Sol/xhigh) or `hybrid-sonnet-implementer` fallback
 
 ## Architecture
 
