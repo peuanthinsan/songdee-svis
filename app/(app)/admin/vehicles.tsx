@@ -133,7 +133,7 @@ export default function AdminVehiclesScreen() {
           style={styles.headerBtn}
           activeOpacity={0.7}
         >
-          <Ionicons name="add" size={26} color={colors.textPrimary} />
+          <Ionicons name="add" size={26} color={colors.onPrimary} />
         </TouchableOpacity>
       ),
     });
@@ -443,7 +443,7 @@ export default function AdminVehiclesScreen() {
                     <Ionicons
                       name={VEHICLE_TYPE_ICONS[vt]}
                       size={18}
-                      color={form.vehicle_type === vt ? colors.textPrimary : colors.textSecondary}
+                      color={form.vehicle_type === vt ? colors.onPrimary : colors.textSecondary}
                     />
                     <Text
                       style={[
@@ -498,7 +498,7 @@ export default function AdminVehiclesScreen() {
                   disabled={saving}
                 >
                   {saving ? (
-                    <ActivityIndicator size="small" color={colors.textPrimary} />
+                    <ActivityIndicator size="small" color={colors.onPrimary} />
                   ) : (
                     <Text style={styles.saveBtnText}>{t('admin.save')}</Text>
                   )}
@@ -560,7 +560,7 @@ const styles = StyleSheet.create({
   retryText: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.textPrimary,
+    color: colors.onPrimary,
   },
   headerBtn: {
     paddingHorizontal: spacing.sm,
@@ -621,7 +621,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   fleetPillTextActive: {
-    color: colors.textPrimary,
+    color: colors.onPrimary,
   },
   // Count
   countLabel: {
@@ -753,7 +753,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   typeBtnLabelActive: {
-    color: colors.textPrimary,
+    color: colors.onPrimary,
   },
   // Modal actions
   modalActions: {
@@ -787,7 +787,7 @@ const styles = StyleSheet.create({
   saveBtnText: {
     fontSize: 15,
     fontWeight: '700',
-    color: colors.textPrimary,
+    color: colors.onPrimary,
   },
   deleteModalBtn: {
     flexDirection: 'row',

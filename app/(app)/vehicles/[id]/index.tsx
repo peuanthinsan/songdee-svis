@@ -71,7 +71,7 @@ export default function VehicleDetail() {
           onPress={() => { setError(false); setLoading(true); fetchData(); }}
           activeOpacity={0.7}
         >
-          <Text style={{ fontWeight: '600' }}>{t('general.retry')}</Text>
+          <Text style={{ fontWeight: '600', color: colors.onPrimary }}>{t('general.retry')}</Text>
         </TouchableOpacity>
       </View>
     );

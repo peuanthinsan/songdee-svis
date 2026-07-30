@@ -293,7 +293,7 @@ export default function ChecklistEditorScreen() {
                   <Ionicons
                     name={vehicleTypeIcon(vt)}
                     size={14}
-                    color={active ? colors.textPrimary : colors.textSecondary}
+                    color={active ? colors.onPrimary : colors.textSecondary}
                     style={{ marginRight: 4 }}
                   />
                   <Text style={[styles.toggleText, active && styles.toggleTextActive]}>
@@ -345,7 +345,7 @@ export default function ChecklistEditorScreen() {
             {filteredItems.length} {locale === 'th' ? 'รายการ' : 'items'}
           </Text>
           <TouchableOpacity style={styles.addButton} onPress={openAdd} activeOpacity={0.8}>
-            <Ionicons name="add" size={20} color={colors.textPrimary} />
+            <Ionicons name="add" size={20} color={colors.onPrimary} />
             <Text style={styles.addButtonText}>{t('admin.checklist.add')}</Text>
           </TouchableOpacity>
         </View>
@@ -534,7 +534,7 @@ export default function ChecklistEditorScreen() {
                 disabled={saving}
               >
                 {saving ? (
-                  <ActivityIndicator size="small" color={colors.textPrimary} />
+                  <ActivityIndicator size="small" color={colors.onPrimary} />
                 ) : (
                   <Text style={styles.saveText}>{t('admin.save')}</Text>
                 )}
@@ -597,7 +597,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   toggleTextActive: {
-    color: colors.textPrimary,
+    color: colors.onPrimary,
   },
 
   // Search bar
@@ -653,7 +653,7 @@ const styles = StyleSheet.create({
   addButtonText: {
     fontSize: 13,
     fontWeight: '700',
-    color: colors.textPrimary,
+    color: colors.onPrimary,
   },
 
   // List
@@ -729,7 +729,7 @@ const styles = StyleSheet.create({
   retryText: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.textPrimary,
+    color: colors.onPrimary,
   },
 
   // Modal
@@ -799,7 +799,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   chipTextActive: {
-    color: colors.textPrimary,
+    color: colors.onPrimary,
   },
 
   // Modal actions
@@ -844,6 +844,6 @@ const styles = StyleSheet.create({
   saveText: {
     fontSize: 15,
     fontWeight: '700',
-    color: colors.textPrimary,
+    color: colors.onPrimary,
   },
 });

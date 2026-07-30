@@ -8,7 +8,7 @@ export default function IssuesLayout() {
   return (
     <Stack screenOptions={{
       headerStyle: { backgroundColor: colors.primary },
-      headerTintColor: colors.textPrimary,
+      headerTintColor: colors.onPrimary,
       headerTitleStyle: { fontWeight: '700' },
       headerRight: () => <HeaderLogo />,
     }}>

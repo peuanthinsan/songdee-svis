@@ -645,7 +645,7 @@ export default function InspectScreen() {
           title: editMode ? t('inspection.editTitle') : t('inspection.daily'),
           headerLeft: () => (
             <TouchableOpacity onPress={() => router.replace('/(app)/vehicles')} style={{ paddingRight: spacing.sm }}>
-              <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+              <Ionicons name="arrow-back" size={24} color={colors.onPrimary} />
             </TouchableOpacity>
           ),
         }}
@@ -751,7 +751,7 @@ export default function InspectScreen() {
               onPress={() => vehicle && loadChecklist(vehicle.vehicle_type)}
               activeOpacity={0.7}
             >
-              <Text style={{ fontWeight: '600' }}>{t('general.retry')}</Text>
+              <Text style={{ fontWeight: '600', color: colors.onPrimary }}>{t('general.retry')}</Text>
             </TouchableOpacity>
           </View>
         )}

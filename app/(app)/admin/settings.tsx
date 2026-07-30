@@ -92,7 +92,7 @@ export default function AdminSettingsScreen() {
           activeOpacity={0.75}
         >
           {saving
-            ? <ActivityIndicator size="small" color={colors.textPrimary} />
+            ? <ActivityIndicator size="small" color={colors.onPrimary} />
             : <Text style={styles.saveBtnText}>{t('admin.settings.save')}</Text>
           }
         </TouchableOpacity>
@@ -133,5 +133,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   saveBtnDisabled: { opacity: 0.45 },
-  saveBtnText: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  saveBtnText: { fontSize: 15, fontWeight: '700', color: colors.onPrimary },
 });
