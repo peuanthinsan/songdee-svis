@@ -8,6 +8,6 @@
     <rect x="52" y="93" width="76" height="29" fill="#292929"/>
     <path d="M52 52 128 97v25L52 77Z" fill="#ed1c24"/>
   </g>
-  <text x="100" y="34" fill="#7a1424" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="800" letter-spacing="1.5">SONGDEE</text>
-  <text x="98" y="84" fill="#06264b" font-family="Inter,Arial,sans-serif" font-size="58" font-weight="850" letter-spacing="4">VIS</text>
+  <text x="98" y="34" textLength="112" lengthAdjust="spacingAndGlyphs" fill="#7a1424" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="800">SONGDEE</text>
+  <text x="98" y="84" textLength="112" lengthAdjust="spacingAndGlyphs" fill="#06264b" font-family="Inter,Arial,sans-serif" font-size="58" font-weight="850">VIS</text>
 </svg>
