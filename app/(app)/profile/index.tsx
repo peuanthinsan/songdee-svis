@@ -122,7 +122,7 @@ export default function ProfileScreen() {
               activeOpacity={0.8}
             >
               {savingName ? (
-                <ActivityIndicator size="small" color={colors.textPrimary} />
+                <ActivityIndicator size="small" color={colors.onPrimary} />
               ) : (
                 <Text style={styles.saveNameBtnText}>{t('profile.save')}</Text>
               )}
@@ -228,7 +228,7 @@ export default function ProfileScreen() {
               activeOpacity={0.8}
             >
               {savingPw ? (
-                <ActivityIndicator color={colors.textPrimary} />
+                <ActivityIndicator color={colors.onPrimary} />
               ) : (
                 <Text style={styles.saveButtonText}>{t('profile.save')}</Text>
               )}
@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
   saveNameBtnText: {
     fontSize: 14,
     fontWeight: '700',
-    color: colors.textPrimary,
+    color: colors.onPrimary,
   },
   // Cards
   card: {
@@ -352,7 +352,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   langOptionTextActive: {
-    color: colors.textPrimary,
+    color: colors.onPrimary,
     fontWeight: '700',
   },
   // Password
@@ -388,7 +388,7 @@ const styles = StyleSheet.create({
   saveButtonText: {
     fontSize: 16,
     fontWeight: '700',
-    color: colors.textPrimary,
+    color: colors.onPrimary,
   },
   // Logout
   logoutButton: {

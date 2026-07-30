@@ -3,6 +3,7 @@ import { brand } from '../branding';
 export const colors = {
   primary: brand.primary,
   accent: brand.accent,
+  onPrimary: brand.primaryText,
   white: '#FFFFFF',
   background: '#F5F5F5',
   cardBackground: '#FFFFFF',

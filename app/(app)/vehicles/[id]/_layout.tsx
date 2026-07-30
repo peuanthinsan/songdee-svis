@@ -8,7 +8,7 @@ export default function VehicleDetailLayout() {
     <Stack
       screenOptions={{
         headerStyle: { backgroundColor: colors.primary },
-        headerTintColor: colors.textPrimary,
+        headerTintColor: colors.onPrimary,
         headerTitleStyle: { fontWeight: '700' },
       }}
     >

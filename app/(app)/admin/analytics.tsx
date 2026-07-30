@@ -528,7 +528,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   periodBtnTextActive: {
-    color: colors.textPrimary,
+    color: colors.onPrimary,
   },
   // Card
   card: {
@@ -693,6 +693,6 @@ const styles = StyleSheet.create({
   retryText: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.textPrimary,
+    color: colors.onPrimary,
   },
 });
