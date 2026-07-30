@@ -305,7 +305,7 @@ export default function UsersManagementScreen() {
             />
           </View>
           <TouchableOpacity style={styles.addButton} onPress={openAdd} activeOpacity={0.8}>
-            <Ionicons name="person-add-outline" size={18} color={colors.textPrimary} />
+            <Ionicons name="person-add-outline" size={18} color={colors.onPrimary} />
           </TouchableOpacity>
         </View>
 
@@ -472,7 +472,7 @@ export default function UsersManagementScreen() {
                 disabled={saving}
               >
                 {saving ? (
-                  <ActivityIndicator size="small" color={colors.textPrimary} />
+                  <ActivityIndicator size="small" color={colors.onPrimary} />
                 ) : (
                   <Text style={styles.saveText}>{t('admin.save')}</Text>
                 )}
@@ -631,7 +631,7 @@ const styles = StyleSheet.create({
   retryText: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.textPrimary,
+    color: colors.onPrimary,
   },
   // Modal
   modalOverlay: {
@@ -699,7 +699,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   roleChipTextActive: {
-    color: colors.textPrimary,
+    color: colors.onPrimary,
   },
   // Actions
   modalActions: {
@@ -733,6 +733,6 @@ const styles = StyleSheet.create({
   saveText: {
     fontSize: 15,
     fontWeight: '700',
-    color: colors.textPrimary,
+    color: colors.onPrimary,
   },
 });

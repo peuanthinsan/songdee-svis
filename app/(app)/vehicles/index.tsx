@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
   errorText: { fontSize: 16, color: colors.accent, marginBottom: spacing.md },
   retryBtn: { backgroundColor: colors.primary, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: borderRadius.sm },
-  retryText: { fontWeight: '600', color: colors.textPrimary },
+  retryText: { fontWeight: '600', color: colors.onPrimary },
   // Search
   searchWrap: {
     flexDirection: 'row',
