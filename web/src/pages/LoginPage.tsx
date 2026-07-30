@@ -91,7 +91,7 @@ export function LoginPage() {
     <div className="login-page">
       <div className="login-card">
         <div className="login-card__intro">
-          <img className="login-card__logo" src={`${import.meta.env.BASE_URL}logo.svg`} alt="SVIS" />
+          <img className="login-card__logo" src={`${import.meta.env.BASE_URL}logo.svg`} alt="Songdee VIS" />
           <div className="login-card__badge" style={{ background: brand.primary, color: brand.primaryText }}>
             {brand.productName}
           </div>

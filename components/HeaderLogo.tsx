@@ -7,7 +7,7 @@ export function HeaderLogo() {
     <View style={styles.wrap}>
       <View style={styles.chip}>
         <Image
-          source={require('../assets/svis-mark.svg')}
+          source={require('../assets/songdee-vis-logo.svg')}
           style={styles.logo}
           contentFit="contain"
         />
@@ -28,7 +28,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.sm,
   },
   logo: {
-    width: 38,
+    width: 100,
     height: 32,
   },
 });

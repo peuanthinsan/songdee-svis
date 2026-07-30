@@ -11,7 +11,7 @@ export function Layout() {
     <div className="app-shell">
       <header className="topbar">
         <div className="topbar__brand">
-          <img className="topbar__logo" src={`${import.meta.env.BASE_URL}logo.svg`} alt={brand.appName} />
+          <img className="topbar__logo" src={`${import.meta.env.BASE_URL}logo.svg`} alt="Songdee VIS" />
           <div>
             <div className="topbar__title">{brand.appName}</div>
             <div className="topbar__subtitle">{t('dashboard')}</div>
