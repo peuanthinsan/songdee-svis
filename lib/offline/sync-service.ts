@@ -1,9 +1,10 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import { getDb } from './database';
-import { apiFetch, API_BASE, getAuthToken } from '../api';
+import { apiFetch, API_BASE, isAuthTokenCurrent } from '../api';
 
 type PendingInspection = {
   id: string;
+  owner_scope: string;
   payload: string;
   photo_uris: string;
   status: string;
@@ -11,6 +12,19 @@ type PendingInspection = {
   created_at: number;
   attempts: number;
 };
+
+class SyncCancelledError extends Error {
+  constructor() {
+    super('Sync cancelled because the authenticated session changed');
+    this.name = 'SyncCancelledError';
+  }
+}
+
+function assertSyncSession(expectedToken: string, signal?: AbortSignal): void {
+  if (signal?.aborted || !isAuthTokenCurrent(expectedToken)) {
+    throw new SyncCancelledError();
+  }
+}
 
 async function persistUri(uri: string): Promise<string> {
   if (uri.startsWith('http')) return uri; // already remote
@@ -23,6 +37,7 @@ async function persistUri(uri: string): Promise<string> {
 }
 
 export async function queueInspection(
+  ownerScope: string,
   payload: any,
   photoUris: string[],
   photosByItem?: Record<string, string[]>
@@ -55,31 +70,75 @@ export async function queueInspection(
   }
 
   await db.runAsync(
-    'INSERT INTO pending_inspections (id, payload, photo_uris, status, created_at) VALUES (?, ?, ?, ?, ?)',
-    id, JSON.stringify(payload), JSON.stringify(persistedUris), 'pending', Date.now()
+    'INSERT INTO pending_inspections (id, owner_scope, payload, photo_uris, status, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    id, ownerScope, JSON.stringify(payload), JSON.stringify(persistedUris), 'pending', Date.now()
   );
 
   return id;
 }
 
-export async function getPendingCount(): Promise<number> {
+export async function getPendingCount(ownerScope: string): Promise<number> {
   const db = await getDb();
   if (!db) return 0;
   const row = await db.getFirstAsync<{ count: number }>(
-    "SELECT COUNT(*) as count FROM pending_inspections WHERE status IN ('pending', 'failed')"
+    "SELECT COUNT(*) as count FROM pending_inspections WHERE owner_scope = ? AND status IN ('pending', 'failed')",
+    ownerScope
   );
   return row?.count ?? 0;
 }
 
-export async function getPendingInspections(): Promise<PendingInspection[]> {
+export async function getPendingInspections(ownerScope: string): Promise<PendingInspection[]> {
   const db = await getDb();
   if (!db) return [];
   return db.getAllAsync<PendingInspection>(
-    "SELECT * FROM pending_inspections WHERE status IN ('pending', 'failed') ORDER BY created_at ASC"
+    "SELECT * FROM pending_inspections WHERE owner_scope = ? AND status IN ('pending', 'failed') ORDER BY created_at ASC",
+    ownerScope
   );
 }
 
-async function uploadPhoto(uri: string): Promise<string> {
+async function adoptLegacyPendingInspections(
+  ownerScope: string,
+  userId: string,
+  expectedToken: string,
+  signal?: AbortSignal
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const legacyRows = await db.getAllAsync<Pick<PendingInspection, 'id' | 'payload'>>(
+    "SELECT id, payload FROM pending_inspections WHERE owner_scope = '' AND status IN ('pending', 'failed')"
+  );
+
+  for (const item of legacyRows) {
+    try {
+      assertSyncSession(expectedToken, signal);
+      const payload = JSON.parse(item.payload);
+      if (!payload.vehicleId || payload.inspectorId !== userId) continue;
+      // The company-scoped API returns this vehicle only when it belongs to the
+      // active tenant. Adopt legacy rows before any photo upload or submission.
+      await apiFetch(`/api/vehicles?id=${encodeURIComponent(payload.vehicleId)}`, {
+        authToken: expectedToken,
+        signal,
+      });
+      assertSyncSession(expectedToken, signal);
+      await db.runAsync(
+        "UPDATE pending_inspections SET owner_scope = ? WHERE id = ? AND owner_scope = ''",
+        ownerScope,
+        item.id
+      );
+    } catch (error) {
+      if (error instanceof SyncCancelledError || signal?.aborted) throw error;
+      // This row may belong to another user or company. Leave it unscoped for
+      // its original inspector's next authenticated sync.
+    }
+  }
+}
+
+async function uploadPhoto(
+  uri: string,
+  expectedToken: string,
+  signal?: AbortSignal
+): Promise<string> {
+  assertSyncSession(expectedToken, signal);
   // Remote URLs don't need uploading
   if (uri.startsWith('http')) return uri;
 
@@ -91,28 +150,37 @@ async function uploadPhoto(uri: string): Promise<string> {
     name: filename,
   } as any);
 
-  const token = await getAuthToken();
   const res = await fetch(`${API_BASE}/api/upload?filename=${filename}`, {
     method: 'POST',
     body: formData,
+    signal,
     headers: {
       'Content-Type': 'multipart/form-data',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      Authorization: `Bearer ${expectedToken}`,
     },
   });
+  assertSyncSession(expectedToken, signal);
   if (!res.ok) throw new Error('Photo upload failed');
   const data = await res.json();
   return data.url;
 }
 
-export async function processSyncQueue(): Promise<{ synced: number; failed: number }> {
-  const pending = await getPendingInspections();
+export async function processSyncQueue(
+  ownerScope: string,
+  userId: string,
+  expectedToken: string,
+  signal?: AbortSignal
+): Promise<{ synced: number; failed: number }> {
+  assertSyncSession(expectedToken, signal);
+  await adoptLegacyPendingInspections(ownerScope, userId, expectedToken, signal);
+  const pending = await getPendingInspections(ownerScope);
   let synced = 0;
   let failed = 0;
   const db = await getDb();
   if (!db || pending.length === 0) return { synced, failed };
 
   for (const item of pending) {
+    assertSyncSession(expectedToken, signal);
     if (item.attempts >= 5) {
       await db.runAsync(
         "UPDATE pending_inspections SET status = 'permanently_failed' WHERE id = ?",
@@ -127,13 +195,15 @@ export async function processSyncQueue(): Promise<{ synced: number; failed: numb
       const photoUris: string[] = JSON.parse(item.photo_uris);
 
       // Upload inspection-level photos
-      const photoUrls = await Promise.all(photoUris.map(uploadPhoto));
+      const photoUrls = await Promise.all(
+        photoUris.map((uri) => uploadPhoto(uri, expectedToken, signal))
+      );
       payload.photoUrls = photoUrls;
 
       // Upload odometer photo if it was queued offline.
       const persistedOdometer: string | undefined = payload._persistedOdometerPhoto;
       if (persistedOdometer) {
-        payload.odometerPhotoUrl = await uploadPhoto(persistedOdometer);
+        payload.odometerPhotoUrl = await uploadPhoto(persistedOdometer, expectedToken, signal);
         delete payload._persistedOdometerPhoto;
       }
 
@@ -145,7 +215,7 @@ export async function processSyncQueue(): Promise<{ synced: number; failed: numb
         for (const [itemId, uris] of Object.entries(persistedByItem)) {
           const uploaded: string[] = [];
           for (const uri of uris) {
-            uploaded.push(await uploadPhoto(uri));
+            uploaded.push(await uploadPhoto(uri, expectedToken, signal));
             perItemFilesToCleanup.push(uri);
           }
           uploadedByItem[itemId] = uploaded;
@@ -161,7 +231,10 @@ export async function processSyncQueue(): Promise<{ synced: number; failed: numb
       await apiFetch('/api/inspections', {
         method: 'POST',
         body: JSON.stringify(payload),
+        authToken: expectedToken,
+        signal,
       });
+      assertSyncSession(expectedToken, signal);
 
       // Clean up local photos
       const odometerToCleanup = persistedOdometer ? [persistedOdometer] : [];
@@ -177,6 +250,9 @@ export async function processSyncQueue(): Promise<{ synced: number; failed: numb
       );
       synced++;
     } catch (err: any) {
+      if (err instanceof SyncCancelledError || signal?.aborted) {
+        return { synced, failed };
+      }
       const errorMsg = err.message || 'Unknown error';
       // If it's a conflict (already inspected), mark as synced — someone else got there first
       if (errorMsg.includes('already inspected') || errorMsg.includes('Already inspected')) {

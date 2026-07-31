@@ -13,6 +13,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { colors, spacing, borderRadius, shadows } from '../../../constants/theme';
 import { useI18n } from '../../../lib/i18n-context';
+import { useAuth } from '../../../lib/auth-context';
 import { useRole } from '../../../lib/useRole';
 import { apiFetch } from '../../../lib/api';
 import { useDebounce } from '../../../lib/useDebounce';
@@ -35,6 +36,7 @@ const PAGE_LIMIT = 50;
 
 export default function VehiclesScreen() {
   const { t } = useI18n();
+  const { user } = useAuth();
   const { fleetId, isDriver, isSupervisor, isAdmin } = useRole();
   const [vehicles, setVehicles] = useState<VehicleWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,16 +49,38 @@ export default function VehiclesScreen() {
   const debouncedSearch = useDebounce(search, 300);
   const offsetRef = useRef(0);
   const fetchIdRef = useRef(0);
+  const revalidatingRef = useRef(false);
   const router = useRouter();
 
   const { isOnline } = useConnectivity();
 
   const fetchVehicles = useCallback(async (reset = false) => {
     const myFetchId = ++fetchIdRef.current;
+    if (reset) revalidatingRef.current = true;
     try {
       setError(null);
       const currentOffset = reset ? 0 : offsetRef.current;
       let fetched: VehicleWithStatus[];
+      const companyScope = user?.companyId;
+
+      if (reset && companyScope && !debouncedSearch.trim()) {
+        const cached = await getCachedVehicles(
+          companyScope,
+          isAdmin ? undefined : fleetId
+        );
+        if (myFetchId !== fetchIdRef.current) return;
+        if (cached.length > 0) {
+          setVehicles(cached as VehicleWithStatus[]);
+          setTotal(cached.length);
+          offsetRef.current = cached.length;
+          setHasMore(isOnline && cached.length >= PAGE_LIMIT);
+          setLoading(false);
+        }
+        if (!isOnline) {
+          if (cached.length === 0) setError(t('general.error'));
+          return;
+        }
+      }
 
       try {
         const params = new URLSearchParams();
@@ -67,12 +91,16 @@ export default function VehiclesScreen() {
         const data = await apiFetch(`/api/vehicles?${params.toString()}`);
         if (myFetchId !== fetchIdRef.current) return; // stale response
         fetched = data.vehicles || data;
-        if (reset) cacheVehicles(fetched);
+        if (companyScope && !debouncedSearch.trim()) {
+          void cacheVehicles(companyScope, fetched);
+        }
         setTotal(data.total ?? fetched.length);
       } catch {
         if (myFetchId !== fetchIdRef.current) return;
         if (!reset) { setLoadingMore(false); return; }
-        const cached = await getCachedVehicles(isAdmin ? undefined : fleetId);
+        const cached = companyScope
+          ? await getCachedVehicles(companyScope, isAdmin ? undefined : fleetId)
+          : [];
         fetched = cached as VehicleWithStatus[];
         setTotal(fetched.length);
       }
@@ -97,33 +125,38 @@ export default function VehiclesScreen() {
       setError(t('general.error'));
     } finally {
       if (myFetchId === fetchIdRef.current) {
+        revalidatingRef.current = false;
         setLoading(false);
         setRefreshing(false);
         setLoadingMore(false);
       }
     }
-  }, [debouncedSearch]);
+  }, [debouncedSearch, fleetId, isAdmin, isOnline, t, user?.companyId]);
 
   useFocusEffect(
     useCallback(() => {
-      setLoading(true);
-      setVehicles([]);
+      const hasExistingRows = offsetRef.current > 0;
+      const isSearching = debouncedSearch.trim().length > 0;
+      setLoading(isSearching || !hasExistingRows);
+      if (isSearching) setVehicles([]);
       offsetRef.current = 0;
       setHasMore(true);
       fetchVehicles(true);
-    }, [debouncedSearch])
+      return () => {
+        fetchIdRef.current += 1;
+      };
+    }, [debouncedSearch, fetchVehicles])
   );
 
   const onRefresh = () => {
     setRefreshing(true);
-    setVehicles([]);
     offsetRef.current = 0;
     setHasMore(true);
     fetchVehicles(true);
   };
 
   const loadMore = () => {
-    if (!hasMore || loading || loadingMore) return;
+    if (!hasMore || loading || loadingMore || revalidatingRef.current) return;
     setLoadingMore(true);
     fetchVehicles(false);
   };

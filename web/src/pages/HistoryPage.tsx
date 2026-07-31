@@ -7,10 +7,6 @@ import { PhotoGrid } from '../components/PhotoGrid';
 
 type Range = 'today' | 'week' | 'month';
 
-function pad2(n: number) {
-  return n < 10 ? `0${n}` : `${n}`;
-}
-
 function getDateRange(range: Range) {
   const now = new Date(new Date().getTime() + 7 * 60 * 60 * 1000);
   const endDate = now.toISOString().split('T')[0];

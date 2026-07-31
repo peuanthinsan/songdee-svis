@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import { API_BASE, setOnUnauthorized } from './api';
+import { InteractionManager } from 'react-native';
+import { API_BASE, setAuthToken, setOnUnauthorized } from './api';
 import {
   AUTH_TOKEN_KEY,
   AUTH_USER_KEY,
@@ -45,16 +46,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sessionGenerationRef = useRef(0);
+  const authStorageQueueRef = useRef<Promise<void>>(Promise.resolve());
+
+  const enqueueAuthStorage = useCallback((operation: () => Promise<void>) => {
+    const result = authStorageQueueRef.current.then(operation, operation);
+    authStorageQueueRef.current = result.catch(() => {});
+    return result;
+  }, []);
 
   const signOut = useCallback(async () => {
-    setToken(null);
-    setUser(null);
-    await clearAuthStorage();
+    sessionGenerationRef.current += 1;
     if (refreshTimerRef.current) {
       clearInterval(refreshTimerRef.current);
       refreshTimerRef.current = null;
     }
-  }, []);
+    setAuthToken(null);
+    setToken(null);
+    setUser(null);
+    await enqueueAuthStorage(clearAuthStorage);
+  }, [enqueueAuthStorage]);
 
   // Register 401 handler so apiFetch can trigger sign-out
   useEffect(() => {
@@ -65,44 +76,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return;
 
     let cancelled = false;
-    fetch(`${API_BASE}/api/companies`)
-      .then((res) => {
-        if (!res.ok) throw new Error('Unable to load company branding');
-        return res.json();
-      })
-      .then(async (data) => {
-        if (cancelled) return;
-        const company = (data.companies ?? []).find(
-          (candidate: { slug: string }) => candidate.slug === user.companySlug,
-        );
-        if (
-          !company
-          || (
-            company.primaryColor === user.primaryColor
-            && company.accentColor === user.accentColor
-          )
-        ) {
-          return;
-        }
+    const sessionGeneration = sessionGenerationRef.current;
+    const task = InteractionManager.runAfterInteractions(() => {
+      fetch(`${API_BASE}/api/companies`)
+        .then((res) => {
+          if (!res.ok) throw new Error('Unable to load company branding');
+          return res.json();
+        })
+        .then(async (data) => {
+          if (cancelled) return;
+          const company = (data.companies ?? []).find(
+            (candidate: { slug: string }) => candidate.slug === user.companySlug,
+          );
+          if (
+            !company
+            || (
+              company.primaryColor === user.primaryColor
+              && company.accentColor === user.accentColor
+            )
+          ) {
+            return;
+          }
 
-        const nextUser = {
-          ...user,
-          primaryColor: company.primaryColor,
-          accentColor: company.accentColor,
-        };
-        setUser(nextUser);
-        await SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(nextUser));
-      })
-      .catch(() => {
-        // Offline sessions keep their last authenticated company palette.
-      });
+          const nextUser = {
+            ...user,
+            primaryColor: company.primaryColor,
+            accentColor: company.accentColor,
+          };
+          await enqueueAuthStorage(async () => {
+            if (
+              cancelled
+              || sessionGeneration !== sessionGenerationRef.current
+            ) return;
+            await SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(nextUser));
+          });
+          if (
+            cancelled
+            || sessionGeneration !== sessionGenerationRef.current
+          ) return;
+          setUser(nextUser);
+        })
+        .catch(() => {
+          // Offline sessions keep their last authenticated company palette.
+        });
+    });
 
     return () => {
       cancelled = true;
+      task.cancel();
     };
-  }, [user?.id, user?.companySlug]);
+  }, [enqueueAuthStorage, user?.id, user?.companySlug]);
 
-  const refreshToken = useCallback(async (currentToken: string) => {
+  const refreshToken = useCallback(async (currentToken: string, sessionGeneration: number) => {
     try {
       const res = await fetch(`${API_BASE}/api/auth/refresh`, {
         method: 'POST',
@@ -113,25 +138,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       if (res.ok) {
         const data = await res.json();
+        if (sessionGeneration !== sessionGenerationRef.current) return null;
+        await enqueueAuthStorage(async () => {
+          if (sessionGeneration !== sessionGenerationRef.current) return;
+          await SecureStore.setItemAsync(AUTH_TOKEN_KEY, data.token);
+        });
+        if (sessionGeneration !== sessionGenerationRef.current) return null;
+        setAuthToken(data.token);
         setToken(data.token);
-        await SecureStore.setItemAsync(AUTH_TOKEN_KEY, data.token);
         return data.token;
       }
       // Token expired beyond refresh window — sign out
       if (res.status === 401) {
+        if (sessionGeneration !== sessionGenerationRef.current) return null;
         await signOut();
       }
     } catch {
       // Network error — skip refresh, try again later
     }
     return null;
-  }, [signOut]);
+  }, [enqueueAuthStorage, signOut]);
 
   const startRefreshTimer = useCallback((currentToken: string) => {
     if (refreshTimerRef.current) clearInterval(refreshTimerRef.current);
     refreshTimerRef.current = setInterval(async () => {
+      const sessionGeneration = sessionGenerationRef.current;
       const savedToken = await readAuthToken();
-      if (savedToken) refreshToken(savedToken);
+      if (
+        savedToken
+        && sessionGeneration === sessionGenerationRef.current
+      ) {
+        refreshToken(savedToken, sessionGeneration);
+      }
     }, TOKEN_REFRESH_INTERVAL);
   }, [refreshToken]);
 
@@ -146,12 +184,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (savedToken && savedUser) {
           const parsedUser = JSON.parse(savedUser) as AuthUser;
           if (parsedUser.companyId) {
+            sessionGenerationRef.current += 1;
+            setAuthToken(savedToken);
             setToken(savedToken);
             setUser(parsedUser);
             startRefreshTimer(savedToken);
+          } else {
+            setAuthToken(null);
           }
+        } else {
+          setAuthToken(null);
         }
       } catch (e) {
+        setAuthToken(null);
         console.warn('[Auth] Failed to load saved session');
       } finally {
         setIsLoaded(true);
@@ -163,6 +208,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = useCallback(async (username: string, password: string, companySlug = 'dhl') => {
+    const sessionGeneration = ++sessionGenerationRef.current;
+    if (refreshTimerRef.current) {
+      clearInterval(refreshTimerRef.current);
+      refreshTimerRef.current = null;
+    }
     const res = await fetch(`${API_BASE}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -175,12 +225,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const data = await res.json();
+    if (sessionGeneration !== sessionGenerationRef.current) {
+      throw new Error('Login cancelled');
+    }
+    await enqueueAuthStorage(async () => {
+      if (sessionGeneration !== sessionGenerationRef.current) return;
+      await Promise.all([
+        SecureStore.setItemAsync(AUTH_TOKEN_KEY, data.token),
+        SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(data.user)),
+      ]);
+    });
+    if (sessionGeneration !== sessionGenerationRef.current) {
+      throw new Error('Login cancelled');
+    }
+    setAuthToken(data.token);
     setToken(data.token);
     setUser(data.user);
-    await SecureStore.setItemAsync(AUTH_TOKEN_KEY, data.token);
-    await SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(data.user));
     startRefreshTimer(data.token);
-  }, [startRefreshTimer]);
+  }, [enqueueAuthStorage, startRefreshTimer]);
 
   const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
     const res = await fetch(`${API_BASE}/api/auth/change-password`, {
@@ -199,6 +261,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [token]);
 
   const updateProfile = useCallback(async (firstName: string, lastName: string) => {
+    const sessionGeneration = sessionGenerationRef.current;
     const res = await fetch(`${API_BASE}/api/auth/profile`, {
       method: 'PUT',
       headers: {
@@ -215,9 +278,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const updated = await res.json();
     const newUser = { ...user!, firstName: updated.firstName, lastName: updated.lastName };
+    await enqueueAuthStorage(async () => {
+      if (sessionGeneration !== sessionGenerationRef.current) return;
+      await SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(newUser));
+    });
+    if (sessionGeneration !== sessionGenerationRef.current) return;
     setUser(newUser);
-    await SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(newUser));
-  }, [token, user]);
+  }, [enqueueAuthStorage, token, user]);
 
   return (
     <AuthCtx.Provider value={{

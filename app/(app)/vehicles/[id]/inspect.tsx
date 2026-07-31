@@ -17,7 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { colors, spacing, borderRadius, shadows, statusColors } from '../../../../constants/theme';
 import { useI18n } from '../../../../lib/i18n-context';
-import { apiFetch, API_BASE, getAuthToken } from '../../../../lib/api';
+import { ApiError, apiFetch, API_BASE, getAuthToken } from '../../../../lib/api';
 import { useConnectivity } from '../../../../lib/offline/connectivity';
 import { cacheVehicles, getCachedVehicle, cacheChecklist, getCachedChecklist } from '../../../../lib/offline/cache-service';
 import { queueInspection } from '../../../../lib/offline/sync-service';
@@ -126,21 +126,28 @@ export default function InspectScreen() {
   // getMondayOfWeekThai imported from lib/format-date
 
   async function loadChecklist(vehicleType: string) {
+    if (!user?.companyId) return;
     try {
       setChecklistError(false);
       const checklistType = vehicleType === 'e_van' ? 'e_van' : vehicleType;
       let items: ChecklistItem[];
-      try {
-        items = await apiFetch(
-          `/api/checklist?vehicleType=${checklistType}&frequency=${frequency}`
-        );
-        // Cache for offline use
-        cacheChecklist(checklistType, frequency, items);
-      } catch {
-        // Offline fallback
-        const cached = await getCachedChecklist(checklistType, frequency);
+      if (!isOnline) {
+        const cached = await getCachedChecklist(user.companyId, checklistType, frequency);
         if (!cached) throw new Error('No cached checklist');
         items = cached;
+      } else {
+        try {
+          items = await apiFetch(
+            `/api/checklist?vehicleType=${checklistType}&frequency=${frequency}`
+          );
+          // Cache for offline use
+          void cacheChecklist(user.companyId, checklistType, frequency, items);
+        } catch (error) {
+          if (error instanceof ApiError) throw error;
+          const cached = await getCachedChecklist(user.companyId, checklistType, frequency);
+          if (!cached) throw new Error('No cached checklist');
+          items = cached;
+        }
       }
       setChecklistItems(items);
 
@@ -167,6 +174,11 @@ export default function InspectScreen() {
       setOdometerPhoto(null);
       setVehicleUsable(null);
       setCarryoverItems(new Set());
+
+      // Cached checklist data is sufficient to begin an offline inspection.
+      // Existing-inspection and carryover lookups are network-only and would
+      // otherwise keep the screen behind the loading state until timeout.
+      if (!isOnline) return;
 
       // Check for existing inspection
       try {
@@ -271,15 +283,28 @@ export default function InspectScreen() {
   }
 
   async function loadData() {
+    if (!user?.companyId) return;
     try {
       let found;
-      try {
-        found = await apiFetch(`/api/vehicles?id=${id}`);
-        // Cache for offline
-        if (found) cacheVehicles([found]);
-      } catch {
-        // Offline fallback
-        found = await getCachedVehicle(id!);
+      if (!isOnline) {
+        found = await getCachedVehicle(
+          user.companyId,
+          id!,
+          isAdmin ? undefined : user.fleetId
+        );
+      } else {
+        try {
+          found = await apiFetch(`/api/vehicles?id=${id}`);
+          // Cache for offline
+          if (found) void cacheVehicles(user.companyId, [found]);
+        } catch (error) {
+          if (error instanceof ApiError) throw error;
+          found = await getCachedVehicle(
+            user.companyId,
+            id!,
+            isAdmin ? undefined : user.fleetId
+          );
+        }
       }
       if (found) {
         setVehicle(found);
@@ -509,7 +534,12 @@ export default function InspectScreen() {
           odometerPhotoLocal: odometerPhoto,
           vehicleUsable,
         };
-        await queueInspection(payload, photos, photosByItem);
+        await queueInspection(
+          `${user.companyId}:${user.id}`,
+          payload,
+          photos,
+          photosByItem
+        );
         await refreshPendingCount();
         Alert.alert('', t('offline.savedOffline'), [
           { text: 'OK', onPress: () => router.replace('/(app)/vehicles') },

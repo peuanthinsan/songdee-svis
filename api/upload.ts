@@ -43,14 +43,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Collect raw body with size limit
-    const chunks: Buffer[] = [];
+    const chunks: Uint8Array<ArrayBufferLike>[] = [];
     let totalSize = 0;
     for await (const chunk of req) {
       totalSize += chunk.length;
       if (totalSize > MAX_UPLOAD_SIZE) {
         return res.status(413).json({ error: 'File too large (max 10 MB)' });
       }
-      chunks.push(Buffer.from(chunk));
+      chunks.push(Uint8Array.from(chunk));
     }
     const body = Buffer.concat(chunks);
 

@@ -55,21 +55,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
     const q = search ? `%${search as string}%` : undefined;
 
-    let countResult;
+    let countResultPromise: PromiseLike<any[]>;
     if (fleetId && q) {
-      countResult = await sql`SELECT COUNT(*)::int as total FROM vehicle_master WHERE company_id = ${user.companyId} AND is_active AND fleet_id = ${fleetId as string} AND plate_number ILIKE ${q}`;
+      countResultPromise = sql`SELECT COUNT(*)::int as total FROM vehicle_master WHERE company_id = ${user.companyId} AND is_active AND fleet_id = ${fleetId as string} AND plate_number ILIKE ${q}`;
     } else if (fleetId) {
-      countResult = await sql`SELECT COUNT(*)::int as total FROM vehicle_master WHERE company_id = ${user.companyId} AND is_active AND fleet_id = ${fleetId as string}`;
+      countResultPromise = sql`SELECT COUNT(*)::int as total FROM vehicle_master WHERE company_id = ${user.companyId} AND is_active AND fleet_id = ${fleetId as string}`;
     } else if (q) {
-      countResult = await sql`SELECT COUNT(*)::int as total FROM vehicle_master WHERE company_id = ${user.companyId} AND is_active AND plate_number ILIKE ${q}`;
+      countResultPromise = sql`SELECT COUNT(*)::int as total FROM vehicle_master WHERE company_id = ${user.companyId} AND is_active AND plate_number ILIKE ${q}`;
     } else {
-      countResult = await sql`SELECT COUNT(*)::int as total FROM vehicle_master WHERE company_id = ${user.companyId} AND is_active`;
+      countResultPromise = sql`SELECT COUNT(*)::int as total FROM vehicle_master WHERE company_id = ${user.companyId} AND is_active`;
     }
 
     // Use LATERAL + EXISTS to guarantee exactly one row per vehicle
-    let vehicles;
+    let vehiclesPromise: PromiseLike<any[]>;
     if (fleetId && q) {
-      vehicles = await sql`
+      vehiclesPromise = sql`
         SELECT v.id, v.plate_number, v.vehicle_type, v.fleet_id,
           CASE WHEN d.id IS NOT NULL THEN 'checked' ELSE 'pending' END as daily_status,
           d.overall_status as daily_result, d.inspector_name as daily_checked_by,
@@ -79,7 +79,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         WHERE v.company_id = ${user.companyId} AND v.is_active AND v.fleet_id = ${fleetId as string} AND v.plate_number ILIKE ${q}
         ORDER BY v.plate_number LIMIT ${limit} OFFSET ${offset}`;
     } else if (fleetId) {
-      vehicles = await sql`
+      vehiclesPromise = sql`
         SELECT v.id, v.plate_number, v.vehicle_type, v.fleet_id,
           CASE WHEN d.id IS NOT NULL THEN 'checked' ELSE 'pending' END as daily_status,
           d.overall_status as daily_result, d.inspector_name as daily_checked_by,
@@ -89,7 +89,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         WHERE v.company_id = ${user.companyId} AND v.is_active AND v.fleet_id = ${fleetId as string}
         ORDER BY v.plate_number LIMIT ${limit} OFFSET ${offset}`;
     } else if (q) {
-      vehicles = await sql`
+      vehiclesPromise = sql`
         SELECT v.id, v.plate_number, v.vehicle_type, v.fleet_id,
           CASE WHEN d.id IS NOT NULL THEN 'checked' ELSE 'pending' END as daily_status,
           d.overall_status as daily_result, d.inspector_name as daily_checked_by,
@@ -99,7 +99,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         WHERE v.company_id = ${user.companyId} AND v.is_active AND v.plate_number ILIKE ${q}
         ORDER BY v.fleet_id, v.plate_number LIMIT ${limit} OFFSET ${offset}`;
     } else {
-      vehicles = await sql`
+      vehiclesPromise = sql`
         SELECT v.id, v.plate_number, v.vehicle_type, v.fleet_id,
           CASE WHEN d.id IS NOT NULL THEN 'checked' ELSE 'pending' END as daily_status,
           d.overall_status as daily_result, d.inspector_name as daily_checked_by,
@@ -109,6 +109,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         WHERE v.company_id = ${user.companyId} AND v.is_active
         ORDER BY v.fleet_id, v.plate_number LIMIT ${limit} OFFSET ${offset}`;
     }
+
+    const [countResult, vehicles] = await Promise.all([
+      countResultPromise,
+      vehiclesPromise,
+    ]);
 
     const mapped = vehicles.map((v: any) => ({
       ...v,

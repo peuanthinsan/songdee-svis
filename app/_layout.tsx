@@ -29,16 +29,17 @@ function AuthGate() {
     );
   }
 
-  return <Slot />;
+  const content = <Slot />;
+  return isSignedIn
+    ? <ConnectivityProvider>{content}</ConnectivityProvider>
+    : content;
 }
 
 export default function RootLayout() {
   return (
     <AuthProvider>
       <I18nProvider>
-        <ConnectivityProvider>
-          <AuthGate />
-        </ConnectivityProvider>
+        <AuthGate />
       </I18nProvider>
     </AuthProvider>
   );

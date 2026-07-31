@@ -29,6 +29,7 @@ export async function getDb(): Promise<SQLite.SQLiteDatabase | null> {
       await database.execAsync(
         `CREATE TABLE IF NOT EXISTS pending_inspections (
           id TEXT PRIMARY KEY,
+          owner_scope TEXT NOT NULL,
           payload TEXT NOT NULL,
           photo_uris TEXT NOT NULL DEFAULT '[]',
           status TEXT NOT NULL DEFAULT 'pending',
@@ -36,6 +37,17 @@ export async function getDb(): Promise<SQLite.SQLiteDatabase | null> {
           created_at INTEGER NOT NULL,
           attempts INTEGER NOT NULL DEFAULT 0
         )`
+      );
+      const pendingColumns = await database.getAllAsync<{ name: string }>(
+        'PRAGMA table_info(pending_inspections)'
+      );
+      if (!pendingColumns.some((column) => column.name === 'owner_scope')) {
+        await database.execAsync(
+          "ALTER TABLE pending_inspections ADD COLUMN owner_scope TEXT NOT NULL DEFAULT ''"
+        );
+      }
+      await database.execAsync(
+        'CREATE INDEX IF NOT EXISTS pending_inspections_owner_status_idx ON pending_inspections (owner_scope, status)'
       );
       db = database;
       return database;
