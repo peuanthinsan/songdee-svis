@@ -85,6 +85,7 @@ export default function InspectScreen() {
   const visibleItems = activeZoneSections
     ? checklistItems.filter((ci) => activeZoneSections.includes(ci.section))
     : checklistItems;
+  const visibleFailCount = visibleItems.filter((item) => results[item.id] === 'fail').length;
 
   // Per-zone fail counts and statuses
   const zoneFailCounts: Record<InspectionZone, number> = { front: 0, cabin: 0, cargo_supplies: 0, exterior_tires: 0 };
@@ -914,9 +915,9 @@ export default function InspectScreen() {
             <Text style={styles.photoSectionTitle}>
               {t('inspection.addPhotos')}
             </Text>
-            {hasFailures && (
+            {visibleFailCount > 0 && (
               <Text style={styles.failCountText}>
-                {t('inspection.failCount').replace('{count}', String(failCount))}
+                {t('inspection.failCount').replace('{count}', String(visibleFailCount))}
               </Text>
             )}
 
