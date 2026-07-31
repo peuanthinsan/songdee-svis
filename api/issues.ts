@@ -10,7 +10,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const { status, fleetId, search } = req.query;
+  const { status, fleetId, search, vehicleId } = req.query;
   const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 200);
   const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
   const sql = neon(process.env.DATABASE_URL!);
@@ -23,6 +23,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const f = isAdmin ? (fleetId as string | undefined) : (user.fleetId || undefined);
     if (!isAdmin && !f) return res.status(403).json({ error: 'Forbidden' });
     const q = search ? `%${search as string}%` : undefined;
+
+    // Vehicle detail pages use this scoped query to show only that vehicle's issues.
+    if (vehicleId && typeof vehicleId === 'string') {
+      const issues = await sql`
+        SELECT ir.*, vm.plate_number, vm.vehicle_type, vm.fleet_id as vehicle_fleet,
+          il.inspector_name, il.inspection_date
+        FROM issue_reports ir
+        JOIN vehicle_master vm ON vm.id = ir.vehicle_id
+        LEFT JOIN inspection_logs il ON il.id = ir.inspection_id
+        WHERE ir.company_id = ${user.companyId}
+          AND ir.vehicle_id = ${vehicleId}
+          ${!isAdmin ? sql`AND vm.fleet_id = ${user.fleetId}` : sql``}
+          ${status ? sql`AND ir.status = ${status as string}` : sql``}
+        ORDER BY ir.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
+      return res.status(200).json({ issues, limit, offset });
+    }
 
     let issues;
     if (s && f && q) {
