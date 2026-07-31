@@ -114,7 +114,7 @@ export function MaintenanceTab() {
                 <th>{t('lastTireDate')}</th>
                 <th>{t('lastTireMileage')}</th>
                 <th>{t('lastBatteryDate')}</th>
-                <th></th>
+                <th className="maintenance-table__actions"></th>
               </tr>
             </thead>
             <tbody>
@@ -156,7 +156,7 @@ export function MaintenanceTab() {
                         <td className="muted">{v.lastBatteryChangeDate ?? '—'}</td>
                       </>
                     )}
-                    <td style={{ whiteSpace: 'nowrap' }}>
+                    <td className="maintenance-table__actions" style={{ whiteSpace: 'nowrap' }}>
                       {isEditing ? (
                         <>
                           <button type="button" className="btn btn--accent" style={{ padding: '6px 12px', marginRight: 6 }} onClick={() => save(v.vehicleId)} disabled={saving}>
