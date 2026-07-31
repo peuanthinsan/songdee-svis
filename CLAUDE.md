@@ -53,6 +53,8 @@ database**, not "migration pending". New write scripts must call `requireConfirm
 - **Commands:** gate = `npm run typecheck` at the root + `npm run build:dashboard`.
   There are NO test or lint scripts — the compiler is the whole net; report changes as
   "builds and typechecks; untested by design" and read the full diff before pushing.
+  GitHub Actions runs both gates on every pull request and push to `main`; rely on CI
+  for the broad gate unless diagnosing a CI failure.
 - **Tenancy:** every new domain query must be scoped by the JWT `companyId`. Admin means
   company admin, not cross-company platform admin.
 - **i18n:** UI strings exist in TWO files with non-corresponding keys
