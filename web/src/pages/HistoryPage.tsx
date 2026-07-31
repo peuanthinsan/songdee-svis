@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { fetchHistory, fetchInspectionDetail, type HistoryData, type InspectionDetail } from '../api';
 import { useAuth } from '../AuthContext';
 import { t } from '../i18n';
@@ -122,7 +122,10 @@ function InspectionModal({ inspection, onClose }: { inspection: InspectionDetail
 
 export function HistoryPage() {
   const { user, isDashboardUser } = useAuth();
-  const [range, setRange] = useState<Range>('today');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedRange = searchParams.get('range');
+  const initialRange: Range = requestedRange === 'week' || requestedRange === 'month' ? requestedRange : 'today';
+  const [range, setRange] = useState<Range>(initialRange);
   const [history, setHistory] = useState<HistoryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<InspectionDetail | null>(null);
@@ -146,6 +149,11 @@ export function HistoryPage() {
     return () => { cancelled = true; };
   }, [range, fleetScope]);
 
+  function selectRange(nextRange: Range) {
+    setRange(nextRange);
+    setSearchParams({ range: nextRange });
+  }
+
   if (!user) return <Navigate to="/login" replace />;
   if (!isDashboardUser) return <Navigate to="/login" replace />;
 
@@ -163,7 +171,7 @@ export function HistoryPage() {
             key={key}
             type="button"
             className={`chip${range === key ? ' chip--active' : ''}`}
-            onClick={() => setRange(key)}
+            onClick={() => selectRange(key)}
           >
             {key === 'today' ? t('today') : key === 'week' ? t('thisWeek') : t('thisMonth')}
           </button>

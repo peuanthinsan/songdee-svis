@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { fetchIssues, type IssueRow } from '../api';
 import { useAuth } from '../AuthContext';
 import { t } from '../i18n';
@@ -62,7 +62,12 @@ function IssueModal({ issue, onClose }: { issue: IssueRow; onClose: () => void }
 
 export function IssuesPage() {
   const { user, isDashboardUser } = useAuth();
-  const [status, setStatus] = useState<(typeof statuses)[number]>('open');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedStatus = searchParams.get('status');
+  const initialStatus = statuses.includes(requestedStatus as (typeof statuses)[number])
+    ? requestedStatus as (typeof statuses)[number]
+    : 'open';
+  const [status, setStatus] = useState<(typeof statuses)[number]>(initialStatus);
   const [issues, setIssues] = useState<IssueRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<IssueRow | null>(null);
@@ -85,6 +90,11 @@ export function IssuesPage() {
     return () => { cancelled = true; };
   }, [status, fleetScope]);
 
+  function selectStatus(nextStatus: (typeof statuses)[number]) {
+    setStatus(nextStatus);
+    setSearchParams(nextStatus ? { status: nextStatus } : {});
+  }
+
   if (!user) return <Navigate to="/login" replace />;
   if (!isDashboardUser) return <Navigate to="/login" replace />;
 
@@ -100,7 +110,7 @@ export function IssuesPage() {
             key={s || 'all'}
             type="button"
             className={`chip${status === s ? ' chip--active' : ''}`}
-            onClick={() => setStatus(s)}
+            onClick={() => selectStatus(s)}
           >
             {s ? statusLabel(s) : t('all')}
           </button>

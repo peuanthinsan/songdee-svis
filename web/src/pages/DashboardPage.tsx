@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import {
   downloadExport,
   fetchDashboard,
@@ -461,20 +461,34 @@ export function DashboardPage() {
         <section className="panel attention-card">
           <div className="section-head">
             <h2>{t('outOfService')}</h2>
+            <Link className="section-link" to="/history?range=today">
+              {t('viewTodayHistory')} <span aria-hidden="true">→</span>
+            </Link>
           </div>
           <div className="metric-grid">
-            <div className="metric"><strong>{data.outOfService.total}</strong><span>{t('metricTotal')}</span></div>
-            <div className="metric"><strong>{data.outOfService.today}</strong><span>{t('today')}</span></div>
+            <Link className="metric metric--link" to="/history?range=today">
+              <strong>{data.outOfService.total}</strong><span>{t('metricTotal')}</span>
+            </Link>
+            <Link className="metric metric--link" to="/history?range=today">
+              <strong>{data.outOfService.today}</strong><span>{t('today')}</span>
+            </Link>
           </div>
         </section>
 
         <section className={`panel attention-card${data.withDefect.total > 0 ? ' attention-card--critical' : ''}`}>
           <div className="section-head">
             <h2>{t('withDefect')}</h2>
+            <Link className="section-link" to="/issues?status=open">
+              {t('viewOpenDefects')} <span aria-hidden="true">→</span>
+            </Link>
           </div>
           <div className="metric-grid">
-            <div className="metric"><strong className="text-fail">{data.withDefect.total}</strong><span>{t('metricTotal')}</span></div>
-            <div className="metric"><strong>{data.withDefect.today}</strong><span>{t('today')}</span></div>
+            <Link className="metric metric--link" to="/issues?status=open">
+              <strong className="text-fail">{data.withDefect.total}</strong><span>{t('metricTotal')}</span>
+            </Link>
+            <Link className="metric metric--link" to="/issues?status=open">
+              <strong>{data.withDefect.today}</strong><span>{t('today')}</span>
+            </Link>
           </div>
           {defects.length > 0 ? (
             <div className="defect-list">
