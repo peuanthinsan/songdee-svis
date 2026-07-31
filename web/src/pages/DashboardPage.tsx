@@ -34,17 +34,7 @@ function gpsLabel(status: string) {
 
 function UnitStatusBadge({ status }: { status: string }) {
   return (
-    <span style={{
-      display: 'inline-block',
-      padding: '2px 8px',
-      borderRadius: 999,
-      fontSize: 11,
-      fontWeight: 700,
-      color: '#fff',
-      backgroundColor: GPS_COLOR[status] ?? '#94a3b8',
-      textTransform: 'uppercase',
-      letterSpacing: '0.03em',
-    }}>
+    <span className="status-badge" style={{ backgroundColor: GPS_COLOR[status] ?? '#94a3b8' }}>
       {gpsLabel(status)}
     </span>
   );
@@ -52,8 +42,8 @@ function UnitStatusBadge({ status }: { status: string }) {
 
 function InspectionCell({ done }: { done: boolean }) {
   return done
-    ? <span style={{ color: '#22c55e', fontWeight: 700 }}>✓ {t('unitStatusChecked')}</span>
-    : <span style={{ color: '#ef4444', fontWeight: 700 }}>⚠ {t('unitStatusPending')}</span>;
+    ? <span className="inspection-state inspection-state--done">✓ {t('unitStatusChecked')}</span>
+    : <span className="inspection-state inspection-state--pending">! {t('unitStatusPending')}</span>;
 }
 
 function UnitStatusSection({ unitData }: { unitData: UnitStatusData }) {
@@ -68,9 +58,9 @@ function UnitStatusSection({ unitData }: { unitData: UnitStatusData }) {
 
   if (!unitData.configured) {
     return (
-      <section>
+      <section className="dashboard-section">
         <h2>{t('unitStatus')}</h2>
-        <div className="panel" style={{ color: 'var(--color-muted)', fontSize: 14 }}>
+        <div className="panel table-empty">
           {t('unitStatusNotConfigured')}
         </div>
       </section>
@@ -80,25 +70,27 @@ function UnitStatusSection({ unitData }: { unitData: UnitStatusData }) {
   const { summary } = unitData;
 
   return (
-    <section>
-      <h2>{t('unitStatus')}</h2>
+    <section className="dashboard-section">
+      <div className="section-title-row">
+        <h2>{t('unitStatus')}</h2>
+      </div>
 
       {summary && (
-        <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+        <div className="status-summary">
           {([
             { label: t('unitStatusRunning'), value: summary.running, color: '#22c55e' },
             { label: t('unitStatusStopped'), value: summary.stopped, color: '#f59e0b' },
             { label: t('unitStatusOffline'), value: summary.offline, color: '#94a3b8' },
           ] as const).map(s => (
-            <div key={s.label} className="panel" style={{ flex: '1 0 120px', textAlign: 'center', padding: '12px 8px' }}>
-              <div style={{ fontSize: 26, fontWeight: 800, color: s.color }}>{s.value}</div>
-              <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>{s.label}</div>
+            <div key={s.label} className="status-summary__item">
+              <span><i className="status-summary__dot" style={{ backgroundColor: s.color }} aria-hidden="true" /> {s.label}</span>
+              <strong style={{ color: s.color }}>{s.value}</strong>
             </div>
           ))}
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+      <div className="segmented-control">
         <button
           type="button"
           className={`btn btn--sm ${filter === 'attention' ? 'btn--accent' : 'btn--secondary'}`}
@@ -116,47 +108,41 @@ function UnitStatusSection({ unitData }: { unitData: UnitStatusData }) {
       </div>
 
       {displayed.length === 0 ? (
-        <div className="panel" style={{ color: 'var(--color-muted)', fontSize: 14 }}>
+        <div className="panel table-empty">
           {filter === 'attention' ? t('unitStatusNoPending') : t('unitStatusNoVehicles')}
         </div>
       ) : (
         <div className="panel panel--flush">
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ borderBottom: '2px solid var(--color-border)' }}>
-                {([
-                  t('unitStatusColNo'),
-                  t('unitStatusColPlate'),
-                  t('unitStatusColFleet'),
-                  t('unitStatusColGps'),
-                  t('statusPreDeparture'),
-                  t('statusPostRoute'),
-                  t('statusWeekly'),
-                ] as const).map(h => (
-                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--color-muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {displayed.map((v, i) => (
-                <tr
-                  key={v.plateNumber}
-                  style={{
-                    borderBottom: '1px solid var(--color-border)',
-                    backgroundColor: v.needsAttention ? 'rgba(239,68,68,0.05)' : undefined,
-                  }}
-                >
-                  <td style={{ padding: '10px 12px', color: 'var(--color-muted)', fontWeight: 700 }}>{i + 1}</td>
-                  <td style={{ padding: '10px 12px', fontWeight: 700 }}>{v.plateNumber}</td>
-                  <td style={{ padding: '10px 12px', color: 'var(--color-muted)' }}>{v.fleet}</td>
-                  <td style={{ padding: '10px 12px' }}><UnitStatusBadge status={v.gpsStatus} /></td>
-                  <td style={{ padding: '10px 12px' }}><InspectionCell done={v.inspections.preRoute} /></td>
-                  <td style={{ padding: '10px 12px' }}><InspectionCell done={v.inspections.postRoute} /></td>
-                  <td style={{ padding: '10px 12px' }}><InspectionCell done={v.inspections.weekly} /></td>
+          <div className="table-scroll">
+            <table className="unit-table">
+              <thead>
+                <tr>
+                  {([
+                    t('unitStatusColNo'),
+                    t('unitStatusColPlate'),
+                    t('unitStatusColFleet'),
+                    t('unitStatusColGps'),
+                    t('statusPreDeparture'),
+                    t('statusPostRoute'),
+                    t('statusWeekly'),
+                  ] as const).map(h => <th key={h}>{h}</th>)}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {displayed.map((v, i) => (
+                  <tr key={v.plateNumber} className={v.needsAttention ? 'unit-table__attention' : undefined}>
+                    <td className="muted">{i + 1}</td>
+                    <td><strong>{v.plateNumber}</strong></td>
+                    <td className="muted">{v.fleet}</td>
+                    <td><UnitStatusBadge status={v.gpsStatus} /></td>
+                    <td><InspectionCell done={v.inspections.preRoute} /></td>
+                    <td><InspectionCell done={v.inspections.postRoute} /></td>
+                    <td><InspectionCell done={v.inspections.weekly} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </section>
@@ -199,23 +185,29 @@ function MaintenanceSection({ maintData }: { maintData: MaintenanceData }) {
   ).length;
 
   return (
-    <section>
-      <h2>{t('maintenance')}</h2>
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+    <section className="dashboard-section">
+      <div className="section-title-row">
+        <h2>{t('maintenance')}</h2>
+      </div>
+      <div className="maintenance-grid">
         {MAINT_CATEGORIES.map((c) => {
           const s = maintData.summary[c.key];
           const dueCount = s.due + s.overdue;
           return (
-            <div key={c.key} className="panel" style={{ flex: '1 0 180px', padding: '14px 16px' }}>
-              <div style={{ fontSize: 14, fontWeight: 700 }}>{t(c.labelKey)}</div>
-              <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 8 }}>{t(c.ruleKey)}</div>
-              <div style={{ fontSize: 26, fontWeight: 800, color: dueCount > 0 ? '#ef4444' : '#22c55e' }}>
-                {dueCount}
+            <div key={c.key} className="panel maintenance-card">
+              <div className="maintenance-card__heading">
+                <div>
+                  <strong>{t(c.labelKey)}</strong>
+                  <div className="maintenance-card__rule">{t(c.ruleKey)}</div>
+                </div>
+                <div className="maintenance-card__count" style={{ color: dueCount > 0 ? 'var(--status-fail)' : 'var(--status-pass)' }}>
+                  {dueCount}
+                </div>
               </div>
-              <div style={{ fontSize: 12, color: 'var(--color-muted)' }}>
+              <div className="maintenance-card__meta">
                 {t('maintenanceDueSoon', { days })}
                 {s.overdue > 0 && (
-                  <span style={{ color: '#ef4444', fontWeight: 700 }}> · {t('maintenanceOverdue')} {s.overdue}</span>
+                  <span className="maintenance-card__overdue"> · {t('maintenanceOverdue')} {s.overdue}</span>
                 )}
               </div>
             </div>
@@ -224,7 +216,7 @@ function MaintenanceSection({ maintData }: { maintData: MaintenanceData }) {
       </div>
 
       {dueList.length === 0 ? (
-        <div className="panel" style={{ color: 'var(--color-muted)', fontSize: 14 }}>
+        <div className="panel table-empty">
           {t('maintenanceNoneDue', { days })}
         </div>
       ) : (
@@ -236,7 +228,7 @@ function MaintenanceSection({ maintData }: { maintData: MaintenanceData }) {
                 <span className="muted">
                   {t(e.category.labelKey)}
                   {e.info.status === 'overdue' && (
-                    <strong style={{ color: '#ef4444' }}> · {t('maintenanceOverdue')}</strong>
+                    <strong className="text-fail"> · {t('maintenanceOverdue')}</strong>
                   )}
                   {maintDetail(e.info) && ` · ${maintDetail(e.info)}`}
                 </span>
@@ -247,7 +239,7 @@ function MaintenanceSection({ maintData }: { maintData: MaintenanceData }) {
       )}
 
       {missingBaselines > 0 && (
-        <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
+        <p className="muted maintenance-card__meta">
           {t('maintenanceMissingBaselines', { count: String(missingBaselines) })}
         </p>
       )}
@@ -298,7 +290,7 @@ function StatusDonutCard({
         pending={showChecked ? stat.pending : 0}
         total={stat.total}
         centerChecked={showChecked ? undefined : stat.checked}
-        size={132}
+        size={106}
       />
       <div className="donut-card__types">
         {TYPE_ORDER.filter((k) => composition[k] > 0).map((k, i) => (
@@ -422,7 +414,7 @@ export function DashboardPage() {
 
   return (
     <div className="stack">
-      <div className="page-header">
+      <div className="page-header dashboard-header">
         <div>
           <h1>{t('greeting', { name: user.firstName })}</h1>
           <p className="muted">{t('today')} {data.date}</p>
@@ -451,8 +443,10 @@ export function DashboardPage() {
         </div>
       </div>
 
-      <section>
-        <div className="section-label">{t('inspectionStatusToday')}</div>
+      <section className="dashboard-section">
+        <div className="section-title-row">
+          <div className="section-label">{t('inspectionStatusToday')}</div>
+        </div>
         <div className="donut-grid">
           {/* With telematics the Active ring shows online-per-type vs fleet size;
               without it we fall back to the legacy composition ring. */}
@@ -464,7 +458,7 @@ export function DashboardPage() {
       </section>
 
       <div className="attention-grid">
-        <section className="panel">
+        <section className="panel attention-card">
           <div className="section-head">
             <h2>{t('outOfService')}</h2>
           </div>
@@ -474,7 +468,7 @@ export function DashboardPage() {
           </div>
         </section>
 
-        <section className="panel">
+        <section className={`panel attention-card${data.withDefect.total > 0 ? ' attention-card--critical' : ''}`}>
           <div className="section-head">
             <h2>{t('withDefect')}</h2>
           </div>
@@ -490,7 +484,7 @@ export function DashboardPage() {
                 return (
                   <div className="defect-row" key={v.issueId}>
                     <span>{v.plate} · {v.fleetId}</span>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <div className="defect-row__actions">
                       <span className="muted">{t(v.status === 'in_progress' ? 'inProgress' : 'open')} · {v.ageDays}d</span>
                       {alreadyNotified ? (
                         <span className="tag tag--success">{t('notifyVendorSent')}</span>

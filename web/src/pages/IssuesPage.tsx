@@ -113,37 +113,39 @@ export function IssuesPage() {
         ) : issues.length === 0 ? (
           <div className="table-empty">{t('noData')}</div>
         ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>{t('plate')}</th>
-                <th>{t('fleet')}</th>
-                <th>{t('status')}</th>
-                <th>{t('date')}</th>
-                <th style={{ textAlign:'center' }}>{t('photos') || '📷'}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {issues.map((issue) => {
-                const photoCount = (issue.defect_photo_urls?.length ?? 0) + (issue.completion_photo_urls?.length ?? 0);
-                return (
-                  <tr
-                    key={issue.id}
-                    onClick={() => setSelected(issue)}
-                    style={{ cursor:'pointer' }}
-                  >
-                    <td>{issue.plate_number}</td>
-                    <td>{issue.vehicle_fleet || issue.fleet_id || '—'}</td>
-                    <td><span className={`badge badge--${issue.status}`}>{statusLabel(issue.status)}</span></td>
-                    <td>{issue.inspection_date || issue.created_at?.slice(0, 10)}</td>
-                    <td style={{ textAlign:'center', color: photoCount > 0 ? 'var(--brand-primary)' : 'var(--text-secondary)' }}>
-                      {photoCount > 0 ? `📷 ${photoCount}` : '—'}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="table-scroll">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>{t('plate')}</th>
+                  <th>{t('fleet')}</th>
+                  <th>{t('status')}</th>
+                  <th>{t('date')}</th>
+                  <th style={{ textAlign:'center' }}>{t('photos') || '📷'}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {issues.map((issue) => {
+                  const photoCount = (issue.defect_photo_urls?.length ?? 0) + (issue.completion_photo_urls?.length ?? 0);
+                  return (
+                    <tr
+                      key={issue.id}
+                      onClick={() => setSelected(issue)}
+                      style={{ cursor:'pointer' }}
+                    >
+                      <td><strong>{issue.plate_number}</strong></td>
+                      <td>{issue.vehicle_fleet || issue.fleet_id || '—'}</td>
+                      <td><span className={`badge badge--${issue.status}`}>{statusLabel(issue.status)}</span></td>
+                      <td>{issue.inspection_date || issue.created_at?.slice(0, 10)}</td>
+                      <td style={{ textAlign:'center', color: photoCount > 0 ? 'var(--brand-primary)' : 'var(--text-secondary)' }}>
+                        {photoCount > 0 ? `📷 ${photoCount}` : '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

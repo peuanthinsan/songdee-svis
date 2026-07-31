@@ -37,23 +37,15 @@ export function AdminPage() {
 
   return (
     <div className="stack">
-      <div className="panel" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', borderBottom: '1px solid var(--border)' }}>
+      <div className="panel admin-tabs">
+        <div className="admin-tabs__list" aria-label={t('admin')}>
           {TABS.map((item) => (
             <button
               key={item.id}
               type="button"
+              aria-pressed={tab === item.id}
               onClick={() => setTab(item.id)}
-              style={{
-                padding: '12px 18px',
-                border: 'none',
-                background: 'none',
-                fontWeight: 700,
-                fontSize: 14,
-                cursor: 'pointer',
-                borderBottom: `2px solid ${tab === item.id ? 'var(--brand-accent)' : 'transparent'}`,
-                color: tab === item.id ? 'var(--brand-accent)' : 'var(--text-secondary)',
-              }}
+              className={`admin-tabs__button${tab === item.id ? ' admin-tabs__button--active' : ''}`}
             >
               {t(item.key)}
             </button>
