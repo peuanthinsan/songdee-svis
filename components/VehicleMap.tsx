@@ -22,6 +22,7 @@ type Props = {
   activeZone: InspectionZone | null;
   onZonePress: (zone: InspectionZone) => void;
   zoneLabels: Record<InspectionZone, string>;
+  title: string;
   // Optional external control — if provided, overrides internal toggle state
   diagramVisible?: boolean;
   onToggleDiagram?: () => void;
@@ -51,7 +52,7 @@ const ZONES: InspectionZone[] = ['front', 'cabin', 'cargo_supplies', 'exterior_t
 // Car / Pickup — Top View (300 x 160)
 // Based on the DHL pickup truck with cargo box from the PowerPoint reference
 // ---------------------------------------------------------------------------
-function CarTopView({ zoneStatuses, activeZone, onZonePress }: Omit<Props, 'vehicleType' | 'zoneLabels' | 'zoneFailCounts'>) {
+function CarTopView({ zoneStatuses, activeZone, onZonePress }: Omit<Props, 'vehicleType' | 'zoneLabels' | 'zoneFailCounts' | 'title'>) {
   const W = 300;
   const H = 160;
   return (
@@ -190,7 +191,7 @@ function CarTopView({ zoneStatuses, activeZone, onZonePress }: Omit<Props, 'vehi
 // ---------------------------------------------------------------------------
 // E-Van — Top View (300 x 160)
 // ---------------------------------------------------------------------------
-function EVanTopView({ zoneStatuses, activeZone, onZonePress }: Omit<Props, 'vehicleType' | 'zoneLabels' | 'zoneFailCounts'>) {
+function EVanTopView({ zoneStatuses, activeZone, onZonePress }: Omit<Props, 'vehicleType' | 'zoneLabels' | 'zoneFailCounts' | 'title'>) {
   const W = 300;
   const H = 160;
   return (
@@ -325,7 +326,7 @@ function EVanTopView({ zoneStatuses, activeZone, onZonePress }: Omit<Props, 'veh
 // ---------------------------------------------------------------------------
 // Motorcycle — Top View (200 x 160)
 // ---------------------------------------------------------------------------
-function MotorcycleTopView({ zoneStatuses, activeZone, onZonePress }: Omit<Props, 'vehicleType' | 'zoneLabels' | 'zoneFailCounts'>) {
+function MotorcycleTopView({ zoneStatuses, activeZone, onZonePress }: Omit<Props, 'vehicleType' | 'zoneLabels' | 'zoneFailCounts' | 'title'>) {
   const W = 200;
   const H = 160;
   return (
@@ -452,6 +453,7 @@ export default function VehicleMap({
   activeZone,
   onZonePress,
   zoneLabels,
+  title,
   diagramVisible: diagramVisibleProp,
   onToggleDiagram,
 }: Props) {
@@ -469,7 +471,7 @@ export default function VehicleMap({
         onPress={handleToggle}
         activeOpacity={0.7}
       >
-        <Text style={styles.toggleLabel}>Vehicle Diagram</Text>
+        <Text style={styles.toggleLabel}>{title}</Text>
         <Ionicons
           name={diagramVisible ? 'chevron-up' : 'chevron-down'}
           size={16}
