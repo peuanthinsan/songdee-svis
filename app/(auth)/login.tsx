@@ -119,14 +119,13 @@ export default function LoginScreen() {
     >
       <View style={styles.inner}>
         <View style={styles.logoContainer}>
-          <View style={styles.logoPlaceholder}>
+          <View style={styles.logoCard}>
             <Image
-              source={require('../../assets/svis-visual.png')}
+              source={require('../../assets/songdee-vis-logo.jpg')}
               style={styles.logoImage}
               contentFit="contain"
             />
           </View>
-          <Text style={styles.appName}>SVIS</Text>
           <Text style={styles.subtitle}>Songdee Vehicle Inspection System</Text>
         </View>
 
@@ -356,23 +355,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.xl + 8,
   },
-  logoPlaceholder: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 28,
-    paddingVertical: 18,
+  logoCard: {
+    backgroundColor: colors.white,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderRadius: borderRadius.md,
     marginBottom: spacing.md,
     ...shadows.lg,
   },
   logoImage: {
-    width: 148,
-    height: 148,
-  },
-  appName: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: colors.white,
-    letterSpacing: 2,
+    width: 240,
+    height: 106,
   },
   subtitle: {
     fontSize: 14,
