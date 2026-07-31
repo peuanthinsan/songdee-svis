@@ -56,7 +56,10 @@
       "typedRoutes": true
     },
     "extra": {
-      "router": {}
+      "router": {},
+      "eas": {
+        "projectId": "8616afb2-9fdb-441a-a75f-9f71e5b633b0"
+      }
     },
     "owner": "peuanthinsan"
   }
