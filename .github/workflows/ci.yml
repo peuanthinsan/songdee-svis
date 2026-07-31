@@ -9,6 +9,8 @@ permissions:
   contents: read
 
 concurrency:
+  # Keep only the newest run for each branch. A newer main push cancels the
+  # superseded gate/deploy together, so the newest green SHA remains eligible.
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
@@ -33,3 +35,71 @@ jobs:
         run: npm ci --prefix web
       - name: Build dashboard
         run: npm run build --prefix web
+
+  deploy:
+    name: Deploy production
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm this SHA is still main
+        id: branch-tip
+        shell: bash
+        run: |
+          git fetch --no-tags origin main
+          if [[ "$GITHUB_SHA" == "$(git rev-parse FETCH_HEAD)" ]]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping stale production deployment; main has advanced."
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.branch-tip.outputs.current == 'true'
+        with:
+          node-version: 24
+      - name: Install Vercel CLI
+        if: steps.branch-tip.outputs.current == 'true'
+        run: npm install --global vercel@latest
+      - name: Pull production configuration
+        if: steps.branch-tip.outputs.current == 'true'
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Build production deployment
+        if: steps.branch-tip.outputs.current == 'true'
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Stage production deployment
+        id: stage-production
+        if: steps.branch-tip.outputs.current == 'true'
+        shell: bash
+        run: |
+          deployment_json="$(vercel deploy --prebuilt --prod --skip-domain --format=json --token=${{ secrets.VERCEL_TOKEN }})"
+          deployment_url="$(jq -er '.deployment.url // .url' <<<"$deployment_json")"
+          echo "url=$deployment_url" >> "$GITHUB_OUTPUT"
+      - name: Reconfirm this SHA before promotion
+        id: promotion-tip
+        if: steps.branch-tip.outputs.current == 'true'
+        shell: bash
+        run: |
+          git fetch --no-tags origin main
+          if [[ "$GITHUB_SHA" == "$(git rev-parse FETCH_HEAD)" ]]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping stale production promotion; main advanced during the build."
+          fi
+      - name: Promote production
+        if: steps.promotion-tip.outputs.current == 'true'
+        run: vercel promote "${{ steps.stage-production.outputs.url }}" --yes --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Confirm promoted SHA remains main
+        if: steps.promotion-tip.outputs.current == 'true'
+        shell: bash
+        run: |
+          git fetch --no-tags origin main
+          if [[ "$GITHUB_SHA" != "$(git rev-parse FETCH_HEAD)" ]]; then
+            echo "::warning::Main advanced during promotion; its newer workflow is now the deployment candidate."
+            exit 1
+          fi

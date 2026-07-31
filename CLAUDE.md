@@ -63,9 +63,11 @@ database**, not "migration pending". New write scripts must call `requireConfirm
   seed scripts) — NEVER `git add -A`; commit only your task's files by explicit
   pathspec. Parallel sessions are real: check `git status` + `git log -1` immediately
   before committing.
-- **Deploy:** a push NEVER deploys (`git.deploymentEnabled:false`, region `sin1`).
-  Production ships via `vercel deploy --prod` on request; mobile (Expo/EAS) releases
-  are the user's call only.
+- **Deploy:** a push to `main` starts a Vercel web production deploy after
+  GitHub Actions gates pass. A newer push cancels the superseded workflow, leaving
+  the newest green `main` SHA as the deployment candidate. Pull requests never deploy. Keep
+  `git.deploymentEnabled:false` in `vercel.json` to prevent a duplicate Vercel
+  Git deployment. Mobile (Expo/EAS) releases remain the user's call only.
 - **Models:** plan on Fable/Opus; code with Codex by default (codex-delegation skill — Codex prompts must forbid git); review/verify/git on Fable/Opus.
 
 ## Codex Delegation
