@@ -10,7 +10,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const { startDate, endDate, vehicleId } = req.query;
+  const { startDate, endDate } = req.query;
   // Non-admins always see their own fleet from the JWT (fail closed).
   const isAdmin = user.role === 'admin';
   const fleetId = isAdmin ? (req.query.fleetId as string | undefined) : (user.fleetId || undefined);
@@ -26,20 +26,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     let inspections;
-    if (fleetId && vehicleId) {
-      inspections = await sql`
-        SELECT il.*, vm.plate_number, vm.vehicle_type
-        FROM inspection_logs il
-        JOIN vehicle_master vm ON vm.id = il.vehicle_id
-        WHERE il.inspection_date >= ${startDate as string}
-          AND il.inspection_date <= ${endDate as string}
-          AND il.company_id = ${user.companyId}
-          AND il.fleet_id = ${fleetId as string}
-          AND il.vehicle_id = ${vehicleId as string}
-        ORDER BY il.inspection_date DESC, il.created_at DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `;
-    } else if (fleetId) {
+    if (fleetId) {
       inspections = await sql`
         SELECT il.*, vm.plate_number, vm.vehicle_type
         FROM inspection_logs il
@@ -65,20 +52,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     let countResult;
-    if (fleetId && vehicleId) {
-      countResult = await sql`
-        SELECT
-          COUNT(*)::int as total,
-          COUNT(*) FILTER (WHERE overall_status = 'pass')::int as passed,
-          COUNT(*) FILTER (WHERE overall_status = 'fail')::int as failed
-        FROM inspection_logs
-        WHERE inspection_date >= ${startDate as string}
-          AND inspection_date <= ${endDate as string}
-          AND company_id = ${user.companyId}
-          AND fleet_id = ${fleetId as string}
-          AND vehicle_id = ${vehicleId as string}
-      `;
-    } else if (fleetId) {
+    if (fleetId) {
       countResult = await sql`
         SELECT
           COUNT(*)::int as total,
