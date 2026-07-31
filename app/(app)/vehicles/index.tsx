@@ -245,7 +245,7 @@ export default function VehiclesScreen() {
               style={[styles.card, bothDone && !isDriver && !isSupervisor && !isFail && styles.cardDone]}
               activeOpacity={0.6}
               onPress={() => {
-                router.push(`/(app)/vehicles/${item.id}`);
+                router.push(`/(app)/vehicles/${item.id}/inspect`);
               }}
             >
               <View style={[styles.accent, { backgroundColor: accentColor }]} />

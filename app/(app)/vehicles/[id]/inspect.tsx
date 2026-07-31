@@ -67,24 +67,14 @@ export default function InspectScreen() {
   const [readOnly, setReadOnly] = useState(false);
   const [readOnlyInspector, setReadOnlyInspector] = useState('');
   const [checklistError, setChecklistError] = useState(false);
-  const [diagramVisible, setDiagramVisible] = useState(false);
+  const [diagramVisible, setDiagramVisible] = useState(true);
 
   const failCount = checklistItems.filter(ci => results[ci.id] === 'fail').length;
   const hasFailures = failCount > 0;
-  const answeredCount = checklistItems.filter(ci => results[ci.id] === 'pass' || results[ci.id] === 'fail').length;
   const allItemsAnswered = checklistItems.length > 0 && checklistItems.every(it => results[it.id] === 'pass' || results[it.id] === 'fail');
   const mileageValid = /^\d+$/.test(mileage.trim()) && parseInt(mileage.trim(), 10) >= 0;
   const odometerProvided = !!odometerPhoto;
   const canSubmit = !submitting && checklistItems.length > 0 && allItemsAnswered && mileageValid && odometerProvided && vehicleUsable !== null;
-  const completionPercent = checklistItems.length > 0
-    ? Math.round((answeredCount / checklistItems.length) * 100)
-    : 0;
-  const completedRequirements = [
-    allItemsAnswered,
-    mileageValid && odometerProvided,
-    vehicleUsable !== null,
-  ];
-  const remainingRequirements = completedRequirements.filter((complete) => !complete).length;
 
   const presentSections = SECTION_ORDER.filter((s) =>
     checklistItems.some((ci) => ci.section === s)
@@ -717,72 +707,48 @@ export default function InspectScreen() {
       {!readOnly && (
       <>
       <View style={styles.vehicleHeader}>
-        <View style={styles.vehicleIdentityRow}>
-          <View style={styles.vehicleIdentity}>
-            <Text style={styles.plateNumber}>{vehicle.plate_number}</Text>
-            <View style={styles.vehicleMetaRow}>
-              <View style={styles.vehicleMetaItem}>
-                <Ionicons name="business-outline" size={13} color={styles.fleetText.color} />
-                <Text style={styles.fleetText}>{vehicle.fleet_id}</Text>
-              </View>
-              <View style={styles.vehicleMetaDivider} />
-              <View style={styles.vehicleMetaItem}>
-                <Ionicons name="car-outline" size={13} color={styles.fleetText.color} />
-                <Text style={styles.fleetText}>{t(VEHICLE_TYPE_I18N_KEYS[vehicle.vehicle_type])}</Text>
-              </View>
-            </View>
-            <View style={styles.vehicleMetaItem}>
-              <Ionicons name="calendar-clear-outline" size={13} color={styles.dateText.color} />
-              <Text style={styles.dateText}>
-                {(() => {
-                  const d = new Date();
-                  const dd = String(d.getDate()).padStart(2, '0');
-                  const mm = String(d.getMonth() + 1).padStart(2, '0');
-                  const yyyy = d.getFullYear();
-                  return `${dd}/${mm}/${yyyy}`;
-                })()}
-              </Text>
-            </View>
-          </View>
-          {editMode && (
-            <View style={styles.editBadge}>
-              <Ionicons name="create-outline" size={13} color={colors.white} />
-              <Text style={styles.editBadgeText}>{t('inspection.editing')}</Text>
-            </View>
-          )}
-          <View style={styles.completionStamp}>
-            <Text style={styles.completionNumber}>{answeredCount}/{checklistItems.length}</Text>
-            <Text style={styles.completionLabel}>{completionPercent}%</Text>
-          </View>
+        <View>
+          <Text style={styles.plateNumber}>{vehicle.plate_number}</Text>
+          <Text style={styles.fleetText}>
+            {vehicle.fleet_id} {' \u2022 '}
+            {t(VEHICLE_TYPE_I18N_KEYS[vehicle.vehicle_type])}
+          </Text>
+          <Text style={styles.dateText}>
+            {(() => {
+              const d = new Date();
+              const dd = String(d.getDate()).padStart(2, '0');
+              const mm = String(d.getMonth() + 1).padStart(2, '0');
+              const yyyy = d.getFullYear();
+              return `${dd}/${mm}/${yyyy}`;
+            })()}
+          </Text>
         </View>
-
-        <View style={styles.headerProgressTrack}>
-          <View style={[styles.headerProgressFill, { width: `${completionPercent}%` }]} />
-        </View>
+        {editMode && (
+          <View style={styles.editBadge}>
+            <Ionicons name="create-outline" size={14} color={colors.accent} style={{ marginRight: 4 }} />
+            <Text style={styles.editBadgeText}>{t('inspection.editing')}</Text>
+          </View>
+        )}
       </View>
 
       {/* Frequency toggle */}
-      <View style={styles.frequencySection}>
-        <View style={styles.frequencyRow}>
-          {FREQUENCY_TABS.map((freq) => (
-            <TouchableOpacity
-              key={freq}
-              style={[styles.frequencyBtn, frequency === freq && styles.frequencyBtnActive]}
-              onPress={() => setFrequency(freq)}
-              activeOpacity={0.7}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: frequency === freq }}
-            >
-              <Text style={[styles.frequencyText, frequency === freq && styles.frequencyTextActive]} numberOfLines={1}>
-                {freq === 'daily'
-                  ? t('inspection.dailyEvent')
-                  : freq === 'weekly'
-                  ? t('inspection.weeklyEvent')
-                  : t('inspection.postRouteEvent')}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+      <View style={styles.frequencyRow}>
+        {FREQUENCY_TABS.map((freq) => (
+          <TouchableOpacity
+            key={freq}
+            style={[styles.frequencyBtn, frequency === freq && styles.frequencyBtnActive]}
+            onPress={() => setFrequency(freq)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.frequencyText, frequency === freq && styles.frequencyTextActive]}>
+              {freq === 'daily'
+                ? t('inspection.dailyEvent')
+                : freq === 'weekly'
+                ? t('inspection.weeklyEvent')
+                : t('inspection.postRouteEvent')}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       {/* Interactive vehicle zone map */}
@@ -794,7 +760,6 @@ export default function InspectScreen() {
           activeZone={activeZone}
           onZonePress={setActiveZone}
           zoneLabels={zoneLabels}
-          title={t('inspection.vehicleDiagram')}
           diagramVisible={diagramVisible}
           onToggleDiagram={() => setDiagramVisible(v => !v)}
         />
@@ -821,7 +786,7 @@ export default function InspectScreen() {
             </TouchableOpacity>
           </View>
         )}
-        {visibleItems.map((item, itemIndex) => {
+        {visibleItems.map((item) => {
           const itemResult = results[item.id];
           const itemPhotos = photosByItem[item.id] || [];
           const itemNote = notesByItem[item.id] || '';
@@ -833,57 +798,38 @@ export default function InspectScreen() {
             itemPhotos.length > 0 ||
             !!itemNote;
           return (
-            <View
-              key={item.id}
-              style={[
-                styles.checkCard,
-                itemResult === 'pass' && styles.checkCardPass,
-                itemResult === 'fail' && styles.checkCardFail,
-              ]}
-            >
+            <View key={item.id} style={styles.checkCard}>
               <View style={styles.checkCardHeader}>
                 <TouchableOpacity
                   style={styles.checkLabelWrap}
                   onPress={() => toggleExpanded(item.id)}
                   activeOpacity={0.6}
                 >
-                  <View style={[
-                    styles.itemOrderBadge,
-                    itemResult === 'pass' && styles.itemOrderBadgePass,
-                    itemResult === 'fail' && styles.itemOrderBadgeFail,
-                  ]}>
-                    <Text style={[
-                      styles.itemOrderText,
-                      !!itemResult && styles.itemOrderTextSelected,
-                    ]}>{String(itemIndex + 1).padStart(2, '0')}</Text>
-                  </View>
-                  <View style={styles.checkLabelCopy}>
-                    <Text style={styles.checkLabel}>
-                      {locale === 'th' ? item.item_name_th : item.item_name_en}
-                    </Text>
+                  <Text style={styles.checkLabel}>
+                    {locale === 'th' ? item.item_name_th : item.item_name_en}
+                  </Text>
                   {/* Collapsed-state indicators */}
-                    <View style={styles.indicatorRow}>
-                      {itemPhotos.length > 0 && (
-                        <View style={styles.indicatorChip}>
-                          <Ionicons name="camera" size={11} color={colors.accent} />
-                          <Text style={styles.indicatorText}>{itemPhotos.length}</Text>
-                        </View>
-                      )}
-                      {!!itemNote && (
-                        <Ionicons
-                          name="chatbubble-ellipses"
-                          size={12}
-                          color={colors.accent}
-                          style={{ marginLeft: 6 }}
-                        />
-                      )}
+                  <View style={styles.indicatorRow}>
+                    {itemPhotos.length > 0 && (
+                      <View style={styles.indicatorChip}>
+                        <Ionicons name="camera" size={11} color={colors.accent} />
+                        <Text style={styles.indicatorText}>{itemPhotos.length}</Text>
+                      </View>
+                    )}
+                    {!!itemNote && (
                       <Ionicons
-                        name={expanded ? 'chevron-up' : 'chevron-down'}
-                        size={14}
-                        color={colors.textTertiary}
+                        name="chatbubble-ellipses"
+                        size={12}
+                        color={colors.accent}
                         style={{ marginLeft: 6 }}
                       />
-                    </View>
+                    )}
+                    <Ionicons
+                      name={expanded ? 'chevron-up' : 'chevron-down'}
+                      size={14}
+                      color={colors.textTertiary}
+                      style={{ marginLeft: 6 }}
+                    />
                   </View>
                 </TouchableOpacity>
                 <View style={styles.toggleRow}>
@@ -895,11 +841,6 @@ export default function InspectScreen() {
                     accessibilityLabel={`${locale === 'th' ? item.item_name_th : item.item_name_en} - ${t('inspection.pass')}`}
                     accessibilityState={{ selected: itemResult === 'pass' }}
                   >
-                    <Ionicons
-                      name="checkmark-circle-outline"
-                      size={16}
-                      color={itemResult === 'pass' ? colors.white : colors.statusPass}
-                    />
                     <Text style={[styles.toggleText, itemResult === 'pass' && styles.toggleTextActive]}>
                       {t('inspection.pass')}
                     </Text>
@@ -912,11 +853,6 @@ export default function InspectScreen() {
                     accessibilityLabel={`${locale === 'th' ? item.item_name_th : item.item_name_en} - ${t('inspection.fail')}`}
                     accessibilityState={{ selected: itemResult === 'fail' }}
                   >
-                    <Ionicons
-                      name="close-circle-outline"
-                      size={16}
-                      color={itemResult === 'fail' ? colors.white : colors.statusFail}
-                    />
                     <Text style={[styles.toggleText, itemResult === 'fail' && styles.toggleTextActive]}>
                       {t('inspection.fail')}
                     </Text>
@@ -976,17 +912,9 @@ export default function InspectScreen() {
         {/* Photo section */}
         {checklistItems.length > 0 && (
           <View style={styles.photoSection}>
-            <View style={styles.formSectionHeader}>
-              <View style={styles.formSectionIcon}>
-                <Ionicons name="document-attach-outline" size={19} color={colors.accent} />
-              </View>
-              <View style={styles.formSectionCopy}>
-                <Text style={styles.photoSectionTitle}>{t('inspection.evidenceTitle')}</Text>
-              </View>
-              <View style={styles.optionalBadge}>
-                <Text style={styles.optionalBadgeText}>{t('inspection.optional')}</Text>
-              </View>
-            </View>
+            <Text style={styles.photoSectionTitle}>
+              {t('inspection.addPhotos')}
+            </Text>
             {visibleFailCount > 0 && (
               <Text style={styles.failCountText}>
                 {t('inspection.failCount').replace('{count}', String(visibleFailCount))}
@@ -1023,7 +951,7 @@ export default function InspectScreen() {
         )}
 
         {/* All pass */}
-        {allItemsAnswered && !hasFailures && checklistItems.length > 0 && (
+        {!hasFailures && checklistItems.length > 0 && (
           <View style={styles.allPassRow}>
             <Ionicons name="checkmark-circle" size={20} color={colors.statusPass} style={{ marginRight: spacing.sm }} />
             <Text style={styles.allPassText}>{t('inspection.allPass')}</Text>
@@ -1032,18 +960,10 @@ export default function InspectScreen() {
 
         {/* Mileage section */}
         <View style={styles.mileageSection}>
-          <View style={styles.formSectionHeader}>
-            <View style={styles.formSectionIcon}>
-              <Ionicons name="speedometer-outline" size={19} color={colors.accent} />
-            </View>
-            <View style={styles.formSectionCopy}>
-              <Text style={styles.mileageSectionTitle}>{t('inspection.mileageRecordTitle')}</Text>
-            </View>
-            <View style={styles.requiredBadge}>
-              <Text style={styles.requiredBadgeText}>{t('inspection.required')}</Text>
-            </View>
-          </View>
-          <Text style={styles.fieldLabel}>{t('inspection.currentMileage')}</Text>
+          <Text style={styles.mileageSectionTitle}>
+            {t('inspection.currentMileage')}
+            <Text style={styles.mileageRequiredMark}> *</Text>
+          </Text>
           <TextInput
             style={[styles.mileageInput, !mileageValid && mileage.length > 0 && styles.mileageInputInvalid]}
             placeholder={t('inspection.mileagePlaceholder')}
@@ -1085,18 +1005,10 @@ export default function InspectScreen() {
 
         {/* Final question: is the vehicle usable? (drives the Out of Service card) */}
         <View style={styles.usableSection}>
-          <View style={styles.formSectionHeader}>
-            <View style={styles.formSectionIcon}>
-              <Ionicons name="shield-checkmark-outline" size={19} color={colors.accent} />
-            </View>
-            <View style={styles.formSectionCopy}>
-              <Text style={styles.usableSectionTitle}>{t('inspection.readinessTitle')}</Text>
-            </View>
-            <View style={styles.requiredBadge}>
-              <Text style={styles.requiredBadgeText}>{t('inspection.required')}</Text>
-            </View>
-          </View>
-          <Text style={styles.fieldLabel}>{t('inspection.vehicleUsable')}</Text>
+          <Text style={styles.usableSectionTitle}>
+            {t('inspection.vehicleUsable')}
+            <Text style={styles.mileageRequiredMark}> *</Text>
+          </Text>
           <View style={styles.usableRow}>
             <TouchableOpacity
               style={[styles.usableBtn, vehicleUsable === true && styles.usableBtnYes]}
@@ -1127,17 +1039,7 @@ export default function InspectScreen() {
 
         {/* Notes section */}
         <View style={styles.notesSection}>
-          <View style={styles.formSectionHeader}>
-            <View style={styles.formSectionIcon}>
-              <Ionicons name="create-outline" size={19} color={colors.accent} />
-            </View>
-            <View style={styles.formSectionCopy}>
-              <Text style={styles.notesSectionTitle}>{t('inspection.notes')}</Text>
-            </View>
-            <View style={styles.optionalBadge}>
-              <Text style={styles.optionalBadgeText}>{t('inspection.optional')}</Text>
-            </View>
-          </View>
+          <Text style={styles.notesSectionTitle}>{t('inspection.notes')}</Text>
           <TextInput
             style={styles.notesInput}
             placeholder={t('inspection.notesPlaceholder')}
@@ -1150,7 +1052,7 @@ export default function InspectScreen() {
           />
         </View>
 
-        <View style={{ height: 132 }} />
+        <View style={{ height: 100 }} />
       </ScrollView>
 
       {/* Fixed submit button */}
@@ -1165,21 +1067,6 @@ export default function InspectScreen() {
             <Text style={styles.clearBtnText}>{t('inspection.clearInspection')}</Text>
           </TouchableOpacity>
         )}
-        <View style={styles.submitStatusRow}>
-          <View style={[styles.submitStatusIcon, canSubmit && styles.submitStatusIconReady]}>
-            <Ionicons
-              name={canSubmit ? 'checkmark' : 'hourglass-outline'}
-              size={12}
-              color={canSubmit ? colors.white : colors.textSecondary}
-            />
-          </View>
-          <Text style={[styles.submitStatusText, canSubmit && styles.submitStatusTextReady]}>
-            {canSubmit
-              ? t('inspection.readyToSubmit')
-              : t('inspection.requirementsRemaining').replace('{count}', String(remainingRequirements))}
-          </Text>
-          <Text style={styles.submitStatusCount}>{answeredCount}/{checklistItems.length}</Text>
-        </View>
         <TouchableOpacity
           style={[
             styles.submitBtn,
@@ -1210,7 +1097,7 @@ export default function InspectScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F1F4F6' },
+  container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
   errorText: { fontSize: 16, color: colors.textSecondary },
 
@@ -1251,139 +1138,68 @@ const styles = StyleSheet.create({
   editBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginLeft: 'auto',
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    marginTop: spacing.sm,
+    backgroundColor: statusColors.fail.bg,
     paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: borderRadius.full,
+    paddingHorizontal: 10,
+    borderRadius: borderRadius.sm,
+    alignSelf: 'flex-start',
   },
   editBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.white,
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.accent,
   },
 
   // Vehicle header
   vehicleHeader: {
-    paddingTop: 10,
-    paddingBottom: 8,
+    paddingVertical: 14,
     paddingHorizontal: spacing.md,
-    backgroundColor: '#172B3A',
-  },
-  vehicleIdentityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  vehicleIdentity: {
-    flex: 1,
-  },
-  plateNumber: {
-    fontSize: 21,
-    lineHeight: 26,
-    fontWeight: '900',
-    letterSpacing: 0.3,
-    color: colors.white,
-  },
-  vehicleMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    marginTop: 1,
-  },
-  vehicleMetaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    marginTop: 2,
-  },
-  vehicleMetaDivider: {
-    width: 1,
-    height: 12,
-    marginHorizontal: spacing.sm,
-    marginTop: 3,
-    backgroundColor: 'rgba(255,255,255,0.22)',
-  },
-  fleetText: {
-    fontSize: 12,
-    color: '#C8D3DC',
-    fontWeight: '600',
-  },
-  dateText: {
-    fontSize: 12,
-    color: '#98A9B6',
-    fontWeight: '600',
-  },
-  completionStamp: {
-    minWidth: 54,
-    height: 46,
-    marginLeft: 10,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.09)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-  },
-  completionNumber: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: colors.white,
-  },
-  completionLabel: {
-    fontSize: 8,
-    fontWeight: '700',
-    color: '#AFC0CC',
-  },
-  headerProgressTrack: {
-    height: 3,
-    marginTop: 7,
-    borderRadius: borderRadius.full,
-    overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.12)',
-  },
-  headerProgressFill: {
-    height: '100%',
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.primary,
-  },
-
-  // Frequency toggle
-  frequencySection: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
     backgroundColor: colors.white,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
+  plateNumber: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: colors.textPrimary,
+  },
+  fleetText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  dateText: {
+    fontSize: 13,
+    color: colors.textTertiary,
+    marginTop: 2,
+  },
+
+  // Frequency toggle
   frequencyRow: {
     flexDirection: 'row',
-    padding: 3,
-    borderRadius: borderRadius.md,
-    gap: 3,
-    backgroundColor: '#EEF2F4',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    gap: spacing.md,
   },
   frequencyBtn: {
-    flex: 1,
-    minHeight: 32,
-    paddingHorizontal: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 9,
+    paddingBottom: 6,
   },
   frequencyBtnActive: {
-    backgroundColor: colors.white,
-    ...shadows.sm,
+    borderBottomWidth: 2,
+    borderBottomColor: colors.accent,
   },
   frequencyText: {
-    fontSize: 12,
+    fontSize: 14,
     color: colors.textSecondary,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   frequencyTextActive: {
-    color: '#172B3A',
-    fontWeight: '800',
+    color: colors.accent,
+    fontWeight: '700',
   },
 
   // Carryover banner
@@ -1405,20 +1221,18 @@ const styles = StyleSheet.create({
 
   // Vehicle usable question
   usableSection: {
-    padding: 12,
-    marginTop: 8,
+    padding: spacing.md,
+    marginTop: spacing.sm,
     marginHorizontal: spacing.md,
     backgroundColor: colors.white,
     borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: '#E1E7EA',
     ...shadows.sm,
   },
   usableSectionTitle: {
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: '800',
-    color: '#172B3A',
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
   },
   usableRow: {
     flexDirection: 'row',
@@ -1426,14 +1240,12 @@ const styles = StyleSheet.create({
   },
   usableBtn: {
     flex: 1,
-    minHeight: 46,
     paddingVertical: 12,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.sm,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: '#F8FAFA',
+    backgroundColor: colors.white,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   usableBtnYes: {
     backgroundColor: colors.statusPass,
@@ -1451,38 +1263,34 @@ const styles = StyleSheet.create({
 
   // Notes
   notesSection: {
-    padding: 12,
-    marginTop: 8,
+    padding: spacing.md,
+    marginTop: spacing.sm,
     marginHorizontal: spacing.md,
     backgroundColor: colors.white,
     borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: '#E1E7EA',
     ...shadows.sm,
   },
   notesSectionTitle: {
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: '800',
-    color: '#172B3A',
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
   },
 
   // Mileage / odometer
   mileageSection: {
-    padding: 12,
-    marginTop: 8,
+    padding: spacing.md,
+    marginTop: spacing.sm,
     marginHorizontal: spacing.md,
     backgroundColor: colors.white,
     borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: '#E1E7EA',
     ...shadows.sm,
   },
   mileageSectionTitle: {
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: '800',
-    color: '#172B3A',
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
   },
   mileageRequiredMark: {
     color: colors.statusFail,
@@ -1490,14 +1298,14 @@ const styles = StyleSheet.create({
   },
   mileageInput: {
     borderWidth: 1,
-    borderColor: '#D8E0E4',
-    borderRadius: borderRadius.md,
+    borderColor: colors.border,
+    borderRadius: borderRadius.sm,
     paddingHorizontal: spacing.md,
-    paddingVertical: 13,
+    paddingVertical: spacing.sm + 4,
     fontSize: 17,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textPrimary,
-    backgroundColor: '#F8FAFA',
+    backgroundColor: colors.inputBackground,
     marginBottom: spacing.md,
   },
   mileageInputInvalid: {
@@ -1539,62 +1347,13 @@ const styles = StyleSheet.create({
   },
   notesInput: {
     borderWidth: 1,
-    borderColor: '#D8E0E4',
-    borderRadius: borderRadius.md,
-    padding: 12,
+    borderColor: colors.border,
+    borderRadius: borderRadius.sm,
+    padding: spacing.sm,
     fontSize: 14,
     color: colors.textPrimary,
-    backgroundColor: '#F8FAFA',
-    minHeight: 72,
-  },
-
-  // Formal form section heading
-  formSectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  formSectionIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-    backgroundColor: colors.accent + '0D',
-  },
-  formSectionCopy: {
-    flex: 1,
-  },
-  fieldLabel: {
-    marginBottom: 7,
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.textSecondary,
-  },
-  optionalBadge: {
-    marginLeft: spacing.sm,
-    paddingHorizontal: 7,
-    paddingVertical: 4,
-    borderRadius: borderRadius.full,
-    backgroundColor: '#F0F3F5',
-  },
-  optionalBadgeText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: colors.textSecondary,
-  },
-  requiredBadge: {
-    marginLeft: spacing.sm,
-    paddingHorizontal: 7,
-    paddingVertical: 4,
-    borderRadius: borderRadius.full,
-    backgroundColor: statusColors.fail.bg,
-  },
-  requiredBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: colors.statusFail,
+    backgroundColor: colors.inputBackground,
+    minHeight: 80,
   },
 
   // Checklist
@@ -1602,69 +1361,29 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: spacing.md },
   checkCard: {
     marginHorizontal: spacing.md,
-    marginTop: 7,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
+    marginTop: spacing.sm,
+    padding: spacing.md,
     backgroundColor: colors.white,
     borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderLeftWidth: 4,
-    borderColor: '#E1E7EA',
-    borderLeftColor: '#C8D1D6',
     ...shadows.sm,
-  },
-  checkCardPass: {
-    borderLeftColor: colors.statusPass,
-  },
-  checkCardFail: {
-    borderLeftColor: colors.statusFail,
   },
   checkCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   checkLabelWrap: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  itemOrderBadge: {
-    width: 27,
-    height: 27,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-    backgroundColor: '#EEF2F4',
-  },
-  itemOrderBadgePass: {
-    backgroundColor: colors.statusPass,
-  },
-  itemOrderBadgeFail: {
-    backgroundColor: colors.statusFail,
-  },
-  itemOrderText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: colors.textSecondary,
-  },
-  itemOrderTextSelected: {
-    color: colors.white,
-  },
-  checkLabelCopy: {
-    flex: 1,
+    marginRight: spacing.sm,
   },
   checkLabel: {
-    fontSize: 13,
-    lineHeight: 17,
-    fontWeight: '600',
+    fontSize: 15,
     color: colors.textPrimary,
   },
   indicatorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 2,
+    marginTop: 4,
   },
   indicatorChip: {
     flexDirection: 'row',
@@ -1685,10 +1404,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     alignItems: 'center',
     gap: spacing.xs,
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#EDF0F2',
+    marginTop: 4,
   },
   itemPhotoThumb: {
     width: 56,
@@ -1733,33 +1449,24 @@ const styles = StyleSheet.create({
   itemNoteInput: {
     marginTop: spacing.sm,
     borderWidth: 1,
-    borderColor: '#D8E0E4',
+    borderColor: colors.border,
     borderRadius: borderRadius.sm,
     paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 13,
     color: colors.textPrimary,
-    backgroundColor: '#F8FAFA',
+    backgroundColor: colors.inputBackground,
   },
 
   // Toggle buttons
-  toggleRow: {
-    flexDirection: 'row',
-    gap: 4,
-  },
+  toggleRow: { flexDirection: 'row', gap: spacing.xs },
   toggleBtn: {
-    minWidth: 66,
-    minHeight: 40,
-    flexDirection: 'row',
-    gap: 4,
-    paddingHorizontal: 8,
+    paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: borderRadius.sm,
     borderWidth: 1,
-    borderColor: '#D8E0E4',
-    backgroundColor: '#F8FAFA',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: colors.border,
+    backgroundColor: colors.white,
   },
   togglePass: {
     backgroundColor: colors.statusPass,
@@ -1780,31 +1487,23 @@ const styles = StyleSheet.create({
 
   // Photo section
   photoSection: {
-    padding: 12,
-    marginTop: 8,
+    padding: spacing.md,
+    marginTop: spacing.sm,
     marginHorizontal: spacing.md,
     backgroundColor: colors.white,
     borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: '#E1E7EA',
     ...shadows.sm,
   },
   photoSectionTitle: {
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: '800',
-    color: '#172B3A',
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textPrimary,
   },
   failCountText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.statusFail,
-    marginTop: -3,
-    marginBottom: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: borderRadius.sm,
-    backgroundColor: statusColors.fail.bg,
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 2,
+    marginBottom: spacing.md,
   },
   photoButtons: {
     flexDirection: 'row',
@@ -1814,14 +1513,13 @@ const styles = StyleSheet.create({
   photoBtn: {
     flex: 1,
     flexDirection: 'row',
-    minHeight: 44,
-    paddingVertical: 11,
+    paddingVertical: 12,
     borderRadius: borderRadius.md,
-    backgroundColor: '#F8FAFA',
+    backgroundColor: colors.inputBackground,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#D8E0E4',
+    borderColor: colors.border,
   },
   photoBtnText: {
     color: colors.accent,
@@ -1866,10 +1564,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     marginTop: spacing.sm,
     marginHorizontal: spacing.md,
-    backgroundColor: statusColors.pass.bg,
+    backgroundColor: colors.white,
     borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.statusPass + '30',
   },
   allPassText: {
     fontSize: 16,
@@ -1883,59 +1579,23 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: spacing.md,
-    paddingTop: 10,
+    padding: spacing.md,
     paddingBottom: spacing.lg,
     backgroundColor: colors.white,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    ...shadows.lg,
-  },
-  submitStatusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  submitStatusIcon: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 7,
-    backgroundColor: '#EEF2F4',
-  },
-  submitStatusIconReady: {
-    backgroundColor: colors.statusPass,
-  },
-  submitStatusText: {
-    flex: 1,
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.textSecondary,
-  },
-  submitStatusTextReady: {
-    color: statusColors.pass.text,
-  },
-  submitStatusCount: {
-    marginLeft: spacing.sm,
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#172B3A',
   },
   submitBtn: {
     backgroundColor: colors.accent,
-    minHeight: 52,
-    paddingVertical: 15,
+    paddingVertical: 16,
     borderRadius: borderRadius.md,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   submitBtnPass: {
     backgroundColor: colors.statusPass,
   },
   submitBtnDisabled: {
-    backgroundColor: '#AEB8BE',
+    opacity: 0.5,
   },
   clearBtn: {
     flexDirection: 'row',

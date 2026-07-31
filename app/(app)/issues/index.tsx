@@ -13,7 +13,7 @@ import {
   TextInput,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { colors, spacing, borderRadius, modalOverlay } from '../../../constants/theme';
@@ -87,7 +87,6 @@ export default function IssuesScreen() {
   const { t } = useI18n();
   const { fleetId, isAdmin } = useRole();
   const router = useRouter();
-  const { vehicleId } = useLocalSearchParams<{ vehicleId?: string }>();
   const [issues, setIssues] = useState<IssueWithVehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -116,7 +115,6 @@ export default function IssuesScreen() {
       const currentOffset = reset ? 0 : offsetRef.current;
       const params = new URLSearchParams();
       if (activeTab !== 'all') params.set('status', activeTab);
-      if (vehicleId) params.set('vehicleId', vehicleId);
       if (!isAdmin && fleetId) params.set('fleetId', fleetId);
       params.set('limit', String(PAGE_LIMIT));
       params.set('offset', String(currentOffset));
@@ -138,7 +136,7 @@ export default function IssuesScreen() {
       setRefreshing(false);
       setLoadingMore(false);
     }
-  }, [activeTab, vehicleId]);
+  }, [activeTab]);
 
   useFocusEffect(
     useCallback(() => {
@@ -147,7 +145,7 @@ export default function IssuesScreen() {
       offsetRef.current = 0;
       setHasMore(true);
       fetchIssues(true);
-    }, [activeTab, vehicleId])
+    }, [activeTab])
   );
 
   const onRefresh = () => {
