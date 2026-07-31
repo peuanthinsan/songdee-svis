@@ -21,6 +21,8 @@ export type AuthUser = {
   companyId: string;
   companySlug: string;
   companyName: string;
+  primaryColor: string;
+  accentColor: string;
 };
 
 type AuthContextType = {
@@ -58,6 +60,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setOnUnauthorized(() => signOut());
   }, [signOut]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    let cancelled = false;
+    fetch(`${API_BASE}/api/companies`)
+      .then((res) => {
+        if (!res.ok) throw new Error('Unable to load company branding');
+        return res.json();
+      })
+      .then(async (data) => {
+        if (cancelled) return;
+        const company = (data.companies ?? []).find(
+          (candidate: { slug: string }) => candidate.slug === user.companySlug,
+        );
+        if (
+          !company
+          || (
+            company.primaryColor === user.primaryColor
+            && company.accentColor === user.accentColor
+          )
+        ) {
+          return;
+        }
+
+        const nextUser = {
+          ...user,
+          primaryColor: company.primaryColor,
+          accentColor: company.accentColor,
+        };
+        setUser(nextUser);
+        await SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(nextUser));
+      })
+      .catch(() => {
+        // Offline sessions keep their last authenticated company palette.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, user?.companySlug]);
 
   const refreshToken = useCallback(async (currentToken: string) => {
     try {

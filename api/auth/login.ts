@@ -20,7 +20,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const users = await sql`
-      SELECT u.*, c.slug AS company_slug, c.name AS company_name
+      SELECT
+        u.*,
+        c.slug AS company_slug,
+        c.name AS company_name,
+        c.primary_color AS company_primary_color,
+        c.accent_color AS company_accent_color
       FROM users u
       JOIN companies c ON c.id = u.company_id
       WHERE u.username = ${username}
@@ -75,6 +80,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         companyId: user.company_id,
         companySlug: user.company_slug,
         companyName: user.company_name,
+        primaryColor: user.company_primary_color,
+        accentColor: user.company_accent_color,
       },
     });
   } catch (error: any) {

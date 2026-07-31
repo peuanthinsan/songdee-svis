@@ -1,12 +1,13 @@
 import { Tabs } from 'expo-router';
 import { useI18n } from '../../lib/i18n-context';
 import { useRole } from '../../lib/useRole';
-import { colors } from '../../constants/theme';
+import { useCompanyTheme } from '../../lib/use-company-theme';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 export default function AppLayout() {
   const { t } = useI18n();
   const { isDriver, isAdmin } = useRole();
+  const colors = useCompanyTheme();
 
   return (
     <Tabs

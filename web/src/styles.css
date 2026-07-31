@@ -26,7 +26,8 @@ button, input, select { font: inherit; }
 .app-shell { min-height: 100vh; display: flex; flex-direction: column; }
 .topbar {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 16px 20px; background: var(--panel); border-bottom: 1px solid var(--border);
+  padding: 16px 20px; background: color-mix(in srgb, var(--brand-primary) 8%, var(--panel));
+  border-top: 6px solid var(--brand-primary); border-bottom: 1px solid var(--border);
 }
 .topbar__brand { display: flex; gap: 12px; align-items: center; }
 .topbar__logo {
@@ -39,7 +40,8 @@ button, input, select { font: inherit; }
 .company-pill {
   background: color-mix(in srgb, var(--brand-accent) 12%, white);
   border: 1px solid color-mix(in srgb, var(--brand-accent) 28%, white);
-  border-radius: 999px; color: #07536a; font-size: 12px; font-weight: 700; padding: 5px 9px;
+  border-radius: 999px; color: color-mix(in srgb, var(--brand-accent) 65%, black);
+  font-size: 12px; font-weight: 700; padding: 5px 9px;
 }
 .lang-btn, .link-btn {
   border: 1px solid var(--border); background: var(--panel); border-radius: 8px;
@@ -133,7 +135,8 @@ button, input, select { font: inherit; }
   padding: 10px 12px; background: #fafafa; color: var(--text-primary);
 }
 .login-form input:focus, .login-form select:focus {
-  border-color: var(--brand-accent); box-shadow: 0 0 0 3px rgba(0, 166, 200, 0.14);
+  border-color: var(--brand-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-accent) 14%, transparent);
   outline: none;
 }
 .login-form input:disabled, .login-form select:disabled { color: var(--text-secondary); }

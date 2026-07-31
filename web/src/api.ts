@@ -47,6 +47,8 @@ export type LoginResponse = {
     companyId: string;
     companySlug: string;
     companyName: string;
+    primaryColor: string;
+    accentColor: string;
   };
 };
 

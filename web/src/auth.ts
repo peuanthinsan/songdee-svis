@@ -10,6 +10,8 @@ export type User = {
   companyId: string;
   companySlug: string;
   companyName: string;
+  primaryColor: string;
+  accentColor: string;
 };
 
 const TOKEN_KEY = 'svis_dashboard_token';

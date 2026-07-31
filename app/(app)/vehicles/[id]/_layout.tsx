@@ -1,9 +1,10 @@
 import { Stack } from 'expo-router';
-import { colors } from '../../../../constants/theme';
 import { useI18n } from '../../../../lib/i18n-context';
+import { useCompanyTheme } from '../../../../lib/use-company-theme';
 
 export default function VehicleDetailLayout() {
   const { t } = useI18n();
+  const colors = useCompanyTheme();
   return (
     <Stack
       screenOptions={{
