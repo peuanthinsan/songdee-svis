@@ -281,6 +281,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderRadius: borderRadius.md,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border,
     ...shadows.sm,
   },
   fleetRow: {

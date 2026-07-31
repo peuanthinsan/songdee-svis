@@ -89,18 +89,20 @@ export function SkeletonDashboard() {
 }
 
 const skStyles = StyleSheet.create({
-  container: { padding: spacing.md },
+  container: { padding: 12 },
   searchBar: { marginBottom: spacing.sm },
   summaryCard: {
     backgroundColor: colors.white,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
+    paddingVertical: 11,
     paddingHorizontal: spacing.md,
     backgroundColor: colors.white,
     borderBottomWidth: 1,
@@ -111,13 +113,17 @@ const skStyles = StyleSheet.create({
   donutCard: {
     backgroundColor: colors.white,
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
+    padding: 12,
     marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   fleetRow: {
     backgroundColor: colors.white,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
 });

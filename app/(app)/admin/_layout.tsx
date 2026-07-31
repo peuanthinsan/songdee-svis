@@ -10,7 +10,9 @@ export default function AdminLayout() {
     <Stack screenOptions={{
       headerStyle: { backgroundColor: colors.primary },
       headerTintColor: colors.onPrimary,
-      headerTitleStyle: { fontWeight: '700' },
+      headerTitleStyle: { fontSize: 17, fontWeight: '700' },
+      headerShadowVisible: false,
+      headerBackButtonDisplayMode: 'minimal',
       headerRight: () => <HeaderLogo />,
     }}>
       <Stack.Screen name="index" options={{ title: t('nav.admin') }} />
@@ -20,6 +22,7 @@ export default function AdminLayout() {
       <Stack.Screen name="issues" options={{ title: t('admin.hub.issues') }} />
       <Stack.Screen name="analytics" options={{ title: t('admin.hub.analytics') }} />
       <Stack.Screen name="checklist" options={{ title: t('admin.hub.checklist') }} />
+      <Stack.Screen name="settings" options={{ title: t('admin.hub.settings') }} />
     </Stack>
   );
 }

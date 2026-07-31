@@ -16,7 +16,7 @@ import Svg, { Circle, Text as SvgText, G } from 'react-native-svg';
 import { useFocusEffect } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import { colors, spacing, borderRadius, shadows, statusColors, modalOverlay } from '../../../constants/theme';
+import { colors, spacing, borderRadius, shadows, modalOverlay } from '../../../constants/theme';
 import { useI18n } from '../../../lib/i18n-context';
 import { useRole } from '../../../lib/useRole';
 import { useAuth } from '../../../lib/auth-context';
@@ -626,45 +626,32 @@ export default function DashboardScreen() {
 
         {/* ─── Hero: Donut Chart ─── */}
         <View style={styles.heroCard}>
-          <View style={styles.donutContainer}>
-            {overall.total === 0 ? (
-              <View style={{ alignItems: 'center', paddingVertical: spacing.lg }}>
-                <Ionicons name="analytics-outline" size={48} color={colors.textTertiary} />
-                <Text style={{ color: colors.textSecondary, marginTop: spacing.sm }}>{t('dashboard.noInspections')}</Text>
+          <View style={styles.heroTop}>
+            <View style={styles.donutContainer}>
+              {overall.total === 0 ? (
+                <View style={styles.heroEmpty}>
+                  <Ionicons name="analytics-outline" size={32} color={colors.textTertiary} />
+                  <Text style={styles.heroEmptyText}>{t('dashboard.noInspections')}</Text>
+                </View>
+              ) : (
+                <DonutChart checked={overall.checked} total={overall.total} size={126} />
+              )}
+            </View>
+            <View style={styles.heroMetrics}>
+              <View style={styles.metricRow}>
+                <View style={[styles.metricDot, { backgroundColor: colors.statusChecked }]} />
+                <Text style={styles.metricLabel}>{t('dashboard.checkedLabel')}</Text>
+                <Text style={styles.metricCount}>{overall.checked}</Text>
               </View>
-            ) : (
-              <DonutChart checked={overall.checked} total={overall.total} />
-            )}
-          </View>
-
-          {/* Legend */}
-          <View style={styles.legendRow}>
-            <View style={styles.legendItem}>
-              <Ionicons name="ellipse" size={10} color={colors.statusChecked} />
-              <Text style={styles.legendText}>{t('dashboard.checkedLabel')}</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <Ionicons name="ellipse" size={10} color={colors.statusFail} />
-              <Text style={styles.legendText}>{t('dashboard.pendingLabel')}</Text>
+              <View style={styles.metricDivider} />
+              <View style={styles.metricRow}>
+                <View style={[styles.metricDot, { backgroundColor: colors.statusFail }]} />
+                <Text style={styles.metricLabel}>{t('dashboard.pendingLabel')}</Text>
+                <Text style={styles.metricCount}>{overall.pending}</Text>
+              </View>
+              <Text style={styles.dateLabel}>{t('dashboard.today')} · {data.date}</Text>
             </View>
           </View>
-
-          {/* Stat boxes */}
-          <View style={styles.statBoxRow}>
-            <View style={[styles.statBox, styles.statBoxChecked]}>
-              <Ionicons name="checkmark-circle" size={20} color={colors.statusChecked} />
-              <Text style={styles.statBoxCount}>{overall.checked}</Text>
-              <Text style={styles.statBoxLabel}>{t('dashboard.checkedLabel')}</Text>
-            </View>
-            <View style={[styles.statBox, styles.statBoxPending]}>
-              <Ionicons name="ellipse-outline" size={20} color={colors.statusFail} />
-              <Text style={styles.statBoxCount}>{overall.pending}</Text>
-              <Text style={styles.statBoxLabel}>{t('dashboard.pendingLabel')}</Text>
-            </View>
-          </View>
-
-          {/* Date */}
-          <Text style={styles.dateLabel}>{t('dashboard.today')} {data.date}</Text>
         </View>
 
         {/* ─── Fleet List ─── */}
@@ -921,14 +908,14 @@ const styles = StyleSheet.create({
     color: colors.onPrimary,
   },
   list: {
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: 12,
     paddingBottom: spacing.xl,
   },
   greetingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.md,
+    marginBottom: 10,
     paddingTop: spacing.sm,
     gap: spacing.sm,
   },
@@ -936,12 +923,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   greetingName: {
-    fontSize: 22,
+    fontSize: 19,
     fontWeight: '800',
     color: colors.textPrimary,
   },
   greetingDate: {
-    fontSize: 14,
+    fontSize: 12,
     color: colors.textSecondary,
     marginTop: 2,
   },
@@ -1079,73 +1066,64 @@ const styles = StyleSheet.create({
   heroCard: {
     backgroundColor: colors.white,
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    marginTop: spacing.lg,
-    marginBottom: spacing.lg,
-    alignItems: 'center',
+    padding: 12,
+    marginTop: 10,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
     ...shadows.sm,
   },
+  heroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
   donutContainer: {
-    marginBottom: spacing.sm,
-  },
-
-  /* Legend */
-  legendRow: {
-    flexDirection: 'row',
+    width: 128,
+    minHeight: 126,
+    alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.lg,
-    marginBottom: spacing.md,
   },
-  legendItem: {
-    flexDirection: 'row',
+  heroEmpty: {
+    width: 126,
+    minHeight: 126,
     alignItems: 'center',
-    gap: 4,
-  },
-  legendText: {
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-
-  /* Stat boxes */
-  statBoxRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    width: '100%',
-    marginBottom: spacing.sm,
-  },
-  statBox: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: spacing.md,
+    justifyContent: 'center',
+    backgroundColor: colors.inputBackground,
     borderRadius: borderRadius.md,
-    gap: 4,
   },
-  statBoxChecked: {
-    backgroundColor: statusColors.pass.bg,
-  },
-  statBoxPending: {
-    backgroundColor: statusColors.fail.bg,
-  },
-  statBoxCount: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: colors.textPrimary,
-  },
-  statBoxLabel: {
-    fontSize: 12,
+  heroEmptyText: {
+    fontSize: 11,
     color: colors.textSecondary,
-  },
-
-  /* Date */
-  dateLabel: {
-    fontSize: 13,
-    color: colors.textSecondary,
+    textAlign: 'center',
     marginTop: spacing.xs,
+    paddingHorizontal: spacing.sm,
+  },
+  heroMetrics: { flex: 1 },
+  metricRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 38,
+  },
+  metricDot: { width: 8, height: 8, borderRadius: 4, marginRight: spacing.sm },
+  metricLabel: { flex: 1, fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+  metricCount: { fontSize: 20, fontWeight: '800', color: colors.textPrimary },
+  metricDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  dateLabel: {
+    fontSize: 10,
+    color: colors.textTertiary,
+    fontWeight: '600',
+    marginTop: spacing.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
 
   /* Section title */
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: colors.textPrimary,
     marginBottom: spacing.sm,
@@ -1156,6 +1134,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderRadius: borderRadius.md,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border,
     ...shadows.sm,
   },
 
@@ -1214,8 +1194,10 @@ const weeklyStyles = StyleSheet.create({
   card: {
     backgroundColor: colors.white,
     borderRadius: borderRadius.md,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
+    padding: 12,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
     ...shadows.sm,
   },
   row: {

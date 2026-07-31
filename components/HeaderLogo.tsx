@@ -1,6 +1,5 @@
-import { View, StyleSheet } from 'react-native';
-import { Image } from 'expo-image';
-import { colors, spacing, borderRadius } from '../constants/theme';
+import { View, StyleSheet, Image } from 'react-native';
+import { colors, borderRadius } from '../constants/theme';
 
 export function HeaderLogo() {
   return (
@@ -9,7 +8,7 @@ export function HeaderLogo() {
         <Image
           source={require('../assets/songdee-vis-logo.jpg')}
           style={styles.logo}
-          contentFit="contain"
+          resizeMode="contain"
         />
       </View>
     </View>
@@ -18,17 +17,19 @@ export function HeaderLogo() {
 
 const styles = StyleSheet.create({
   wrap: {
-    paddingRight: spacing.md,
+    paddingRight: 12,
     justifyContent: 'center',
   },
   chip: {
     backgroundColor: colors.white,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
     borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   logo: {
-    width: 100,
-    height: 44,
+    width: 76,
+    height: 30,
   },
 });

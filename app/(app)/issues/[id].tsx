@@ -459,17 +459,19 @@ const styles = StyleSheet.create({
   },
   // Info card with rows
   infoCard: {
-    margin: spacing.md,
+    margin: 12,
     backgroundColor: colors.white,
     borderRadius: borderRadius.md,
-    padding: spacing.md,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
     ...shadows.sm,
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 9,
   },
   infoDivider: {
     height: 1,
@@ -480,25 +482,27 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   infoValue: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: colors.textPrimary,
   },
   // Sections
   section: {
-    marginHorizontal: spacing.md,
+    marginHorizontal: 12,
     marginTop: spacing.sm,
-    padding: spacing.md,
+    padding: 12,
     backgroundColor: colors.white,
     borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
     ...shadows.sm,
   },
   actionSection: {
-    marginHorizontal: spacing.md,
+    marginHorizontal: 12,
     marginTop: spacing.sm,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: colors.textPrimary,
     marginBottom: spacing.md,
@@ -518,12 +522,12 @@ const styles = StyleSheet.create({
   // Buttons
   primaryButton: {
     backgroundColor: colors.accent,
-    paddingVertical: 16,
+    paddingVertical: 13,
     borderRadius: borderRadius.md,
     alignItems: 'center',
   },
   primaryButtonText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: colors.white,
   },

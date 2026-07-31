@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { useI18n } from '../../lib/i18n-context';
 import { useRole } from '../../lib/useRole';
 import { useCompanyTheme } from '../../lib/use-company-theme';
+import { density } from '../../constants/theme';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 export default function AppLayout() {
@@ -15,10 +16,17 @@ export default function AppLayout() {
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textSecondary,
         headerShown: false,
+        tabBarHideOnKeyboard: true,
         tabBarStyle: {
           backgroundColor: colors.white,
           borderTopColor: colors.border,
+          borderTopWidth: 1,
+          height: density.tabBarHeight,
+          paddingTop: 4,
+          paddingBottom: 10,
         },
+        tabBarItemStyle: { paddingVertical: 2 },
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '600', marginTop: 1 },
       }}
     >
       <Tabs.Screen
@@ -26,7 +34,7 @@ export default function AppLayout() {
         options={{
           title: t('nav.profile'),
           tabBarLabel: t('nav.profile'),
-          tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" size={size} color={color} />,
+          tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'person' : 'person-outline'} size={21} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -34,7 +42,7 @@ export default function AppLayout() {
         options={{
           title: t('nav.vehicles'),
           tabBarLabel: t('nav.vehicles'),
-          tabBarIcon: ({ color, size }) => <Ionicons name="car-outline" size={size} color={color} />,
+          tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'car' : 'car-outline'} size={21} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -42,7 +50,7 @@ export default function AppLayout() {
         options={{
           title: t('nav.dashboard'),
           tabBarLabel: t('nav.dashboard'),
-          tabBarIcon: ({ color, size }) => <Ionicons name="bar-chart-outline" size={size} color={color} />,
+          tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'bar-chart' : 'bar-chart-outline'} size={21} color={color} />,
           href: isDriver ? null : undefined,
         }}
       />
@@ -51,7 +59,7 @@ export default function AppLayout() {
         options={{
           title: t('nav.issues'),
           tabBarLabel: t('nav.issues'),
-          tabBarIcon: ({ color, size }) => <Ionicons name="warning-outline" size={size} color={color} />,
+          tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'warning' : 'warning-outline'} size={21} color={color} />,
           href: isDriver ? null : undefined,
         }}
       />
@@ -60,7 +68,7 @@ export default function AppLayout() {
         options={{
           title: t('nav.admin'),
           tabBarLabel: t('nav.admin'),
-          tabBarIcon: ({ color, size }) => <Ionicons name="settings-outline" size={size} color={color} />,
+          tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'settings' : 'settings-outline'} size={21} color={color} />,
           href: isAdmin ? undefined : null,
         }}
       />

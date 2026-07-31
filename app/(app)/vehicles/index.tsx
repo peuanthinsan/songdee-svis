@@ -33,6 +33,7 @@ type VehicleWithStatus = Vehicle & {
 };
 
 const PAGE_LIMIT = 50;
+const ITEM_HEIGHT = 82;
 
 export default function VehiclesScreen() {
   const { t } = useI18n();
@@ -189,8 +190,8 @@ export default function VehiclesScreen() {
         maxToRenderPerBatch={10}
         windowSize={10}
         getItemLayout={(_, index) => ({
-          length: 62,
-          offset: 62 * index,
+          length: ITEM_HEIGHT,
+          offset: ITEM_HEIGHT * index,
           index,
         })}
         onEndReachedThreshold={0.5}
@@ -217,7 +218,10 @@ export default function VehiclesScreen() {
             {/* Summary bar */}
             <View style={styles.summary}>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryNum}>{checked}<Text style={styles.summaryTotal}>/{displayed}</Text></Text>
+                <View>
+                  <Text style={styles.summaryLabel}>{t('dashboard.checkedLabel')}</Text>
+                  <Text style={styles.summaryNum}>{checked}<Text style={styles.summaryTotal}>/{displayed}</Text></Text>
+                </View>
                 <Text style={styles.summaryPct}>{pct}%</Text>
               </View>
               <View style={styles.bar}>
@@ -291,6 +295,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     marginBottom: spacing.sm,
     paddingHorizontal: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
     ...shadows.sm,
   },
   searchIcon: { marginRight: spacing.xs },
@@ -304,20 +310,24 @@ const styles = StyleSheet.create({
   summary: {
     marginHorizontal: spacing.md,
     marginBottom: spacing.sm,
-    padding: spacing.md,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     backgroundColor: colors.white,
     borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
     ...shadows.sm,
   },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginBottom: spacing.sm,
+    alignItems: 'center',
+    marginBottom: 7,
   },
-  summaryNum: { fontSize: 28, fontWeight: '800', color: colors.statusChecked },
-  summaryTotal: { fontSize: 20, fontWeight: '600', color: colors.textSecondary },
-  summaryPct: { fontSize: 20, fontWeight: '700', color: colors.textPrimary },
+  summaryLabel: { fontSize: 10, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.5 },
+  summaryNum: { fontSize: 20, fontWeight: '800', color: colors.statusChecked, marginTop: 1 },
+  summaryTotal: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
+  summaryPct: { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
   bar: { height: 6, backgroundColor: colors.border, borderRadius: 3, overflow: 'hidden' },
   barFill: { height: '100%', backgroundColor: colors.statusChecked, borderRadius: 3 },
   // Card row
@@ -326,13 +336,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: spacing.md,
     marginBottom: spacing.sm,
-    paddingVertical: 14,
-    paddingHorizontal: spacing.md,
-    paddingLeft: spacing.md + 4,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingLeft: 16,
     backgroundColor: colors.white,
     borderRadius: borderRadius.md,
-    gap: spacing.md,
+    gap: 10,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border,
     ...shadows.sm,
   },
   cardDone: { opacity: 0.55 },

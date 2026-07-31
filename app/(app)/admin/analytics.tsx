@@ -511,6 +511,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderRadius: borderRadius.sm,
     padding: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
     ...shadows.sm,
   },
   periodBtn: {
@@ -536,6 +538,8 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
     ...shadows.sm,
     overflow: 'hidden',
   },

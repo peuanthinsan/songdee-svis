@@ -5,18 +5,18 @@ export const colors = {
   accent: brand.accent,
   onPrimary: brand.primaryText,
   white: '#FFFFFF',
-  background: '#F5F5F5',
+  background: '#F3F5F7',
   cardBackground: '#FFFFFF',
-  textPrimary: '#1A1A1A',
-  textSecondary: '#666666',
-  textTertiary: '#999999',
+  textPrimary: '#17212B',
+  textSecondary: '#5F6B78',
+  textTertiary: '#87919C',
   statusPass: '#22C55E',
   statusFail: '#EF4444',
   statusPending: '#F59E0B',
   statusChecked: '#22C55E',
   statusInProgress: '#F59E0B',
-  border: '#E5E5E5',
-  inputBackground: '#F5F5F5',
+  border: '#D8DEE6',
+  inputBackground: '#F7F8FA',
   shadow: '#000000',
 } as const;
 
@@ -63,10 +63,10 @@ export const spacing = {
 } as const;
 
 export const borderRadius = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 24,
+  sm: 6,
+  md: 10,
+  lg: 14,
+  xl: 20,
   full: 9999,
 } as const;
 
@@ -74,24 +74,33 @@ export const shadows = {
   sm: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.025,
     shadowRadius: 2,
-    elevation: 1,
+    elevation: 0,
   },
   md: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.07,
+    shadowRadius: 6,
+    elevation: 2,
   },
   lg: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
   },
+} as const;
+
+export const density = {
+  screenPadding: 12,
+  sectionGap: 12,
+  controlHeight: 44,
+  rowMinHeight: 52,
+  headerHeight: 52,
+  tabBarHeight: 72,
 } as const;
 
 export const statusColors = {

@@ -11,7 +11,9 @@ export default function VehiclesLayout() {
       screenOptions={{
         headerStyle: { backgroundColor: colors.primary },
         headerTintColor: colors.onPrimary,
-        headerTitleStyle: { fontWeight: '700' },
+        headerTitleStyle: { fontSize: 17, fontWeight: '700' },
+        headerShadowVisible: false,
+        headerBackButtonDisplayMode: 'minimal',
         headerRight: () => <HeaderLogo />,
       }}
     >

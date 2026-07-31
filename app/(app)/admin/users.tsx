@@ -537,6 +537,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
     ...shadows.sm,
   },
   footerLoader: {
@@ -559,6 +561,8 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     paddingVertical: 14,
     paddingHorizontal: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
     ...shadows.sm,
   },
   avatar: {

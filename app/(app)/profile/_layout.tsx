@@ -8,9 +8,11 @@ export default function ProfileLayout() {
   const colors = useCompanyTheme();
   return (
     <Stack screenOptions={{
-      headerStyle: { backgroundColor: colors.primary },
       headerTintColor: colors.onPrimary,
-      headerTitleStyle: { fontWeight: '700' },
+      headerTitleStyle: { fontSize: 17, fontWeight: '700' },
+      headerShadowVisible: false,
+      headerBackButtonDisplayMode: 'minimal',
+      headerStyle: { backgroundColor: colors.primary },
       headerRight: () => <HeaderLogo />,
     }}>
       <Stack.Screen name="index" options={{ title: t('nav.profile') }} />

@@ -474,21 +474,25 @@ const styles = StyleSheet.create({
   /* Tab bar */
   tabRow: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
-    gap: spacing.lg,
+    padding: spacing.sm,
+    margin: spacing.sm,
+    marginBottom: 0,
+    gap: 2,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.inputBackground,
   },
   tab: {
-    paddingVertical: spacing.sm,
-    paddingBottom: 10,
-    marginBottom: -1,
+    flex: 1,
+    paddingVertical: 7,
+    alignItems: 'center',
+    borderRadius: 4,
   },
   tabActive: {
-    borderBottomWidth: 2,
-    borderBottomColor: colors.accent,
+    backgroundColor: colors.primary,
   },
   tabText: {
     fontSize: 13,
@@ -496,7 +500,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   tabTextActive: {
-    color: colors.accent,
+    color: colors.onPrimary,
     fontWeight: '700',
   },
 

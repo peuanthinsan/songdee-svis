@@ -673,6 +673,8 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     paddingVertical: spacing.sm + 2,
     paddingHorizontal: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
     ...shadows.sm,
   },
   sortBadge: {

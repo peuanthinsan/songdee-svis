@@ -33,6 +33,7 @@ export default function ProfileScreen() {
   const roleLabel = user?.role
     ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
     : '';
+  const initials = `${user?.firstName?.[0] ?? ''}${user?.lastName?.[0] ?? ''}`.toUpperCase();
 
   async function handleSaveName() {
     if (!firstName.trim() || !lastName.trim()) return;
@@ -74,21 +75,27 @@ export default function ProfileScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       {/* User info */}
       <View style={styles.infoCard}>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>{t('profile.name')}</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-            <Text style={styles.infoValue}>{displayName}</Text>
-            <TouchableOpacity
-              onPress={() => {
-                setFirstName(user?.firstName ?? '');
-                setLastName(user?.lastName ?? '');
-                setShowNameEdit(!showNameEdit);
-              }}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="pencil-outline" size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
+        <View style={styles.profileSummary}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{initials || 'SV'}</Text>
           </View>
+          <View style={styles.profileSummaryText}>
+            <Text style={styles.profileName} numberOfLines={1}>{displayName}</Text>
+            <Text style={styles.profileMeta} numberOfLines={1}>
+              {roleLabel}{user?.companyName ? ` · ${user.companyName}` : ''}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => {
+              setFirstName(user?.firstName ?? '');
+              setLastName(user?.lastName ?? '');
+              setShowNameEdit(!showNameEdit);
+            }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="pencil-outline" size={16} color={colors.textSecondary} />
+          </TouchableOpacity>
         </View>
 
         {showNameEdit && (
@@ -130,11 +137,6 @@ export default function ProfileScreen() {
           </View>
         )}
 
-        <View style={styles.infoDivider} />
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>{t('profile.role')}</Text>
-          <Text style={styles.infoValue}>{roleLabel}</Text>
-        </View>
         <View style={styles.infoDivider} />
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>{t('profile.company')}</Text>
@@ -239,6 +241,7 @@ export default function ProfileScreen() {
 
       {/* Logout */}
       <TouchableOpacity style={styles.logoutButton} onPress={() => signOut()} activeOpacity={0.8}>
+        <Ionicons name="log-out-outline" size={18} color={colors.statusFail} />
         <Text style={styles.logoutText}>{t('profile.logout')}</Text>
       </TouchableOpacity>
     </ScrollView>
@@ -247,20 +250,50 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  scrollContent: { padding: spacing.md, paddingBottom: spacing.xl },
+  scrollContent: { padding: 12, paddingBottom: spacing.xl },
   // Info card
   infoCard: {
     backgroundColor: colors.white,
     borderRadius: borderRadius.md,
-    padding: spacing.md,
-    marginBottom: spacing.md,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
     ...shadows.sm,
+  },
+  profileSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom: 12,
+  },
+  avatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    marginRight: 10,
+  },
+  avatarText: { fontSize: 15, fontWeight: '800', color: colors.onPrimary },
+  profileSummaryText: { flex: 1 },
+  profileName: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
+  profileMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  editButton: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.inputBackground,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 9,
   },
   infoDivider: {
     height: 1,
@@ -271,7 +304,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   infoValue: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: colors.textPrimary,
   },
@@ -315,8 +348,10 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.white,
     borderRadius: borderRadius.md,
-    padding: spacing.md,
-    marginBottom: spacing.md,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
     ...shadows.sm,
   },
   cardHeaderTouchable: {
@@ -325,8 +360,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cardLabel: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
     color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
@@ -378,7 +413,7 @@ const styles = StyleSheet.create({
   saveButton: {
     backgroundColor: colors.primary,
     borderRadius: borderRadius.md,
-    padding: 16,
+    padding: 13,
     alignItems: 'center',
     marginTop: spacing.xs,
   },
@@ -392,11 +427,16 @@ const styles = StyleSheet.create({
   },
   // Logout
   logoutButton: {
-    backgroundColor: colors.accent,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.white,
     borderRadius: borderRadius.md,
-    padding: spacing.md + 2,
+    borderWidth: 1,
+    borderColor: colors.statusFail + '55',
+    padding: 13,
     alignItems: 'center',
-    marginTop: spacing.lg,
+    marginTop: spacing.sm,
   },
-  logoutText: { color: colors.white, fontSize: 16, fontWeight: '700' },
+  logoutText: { color: colors.statusFail, fontSize: 14, fontWeight: '700' },
 });
