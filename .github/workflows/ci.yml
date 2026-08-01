@@ -31,11 +31,12 @@ jobs:
         run: npm ci
       - name: Typecheck app
         run: npm run typecheck
+      - name: Unit tests
+        run: npm test
       - name: Install dashboard dependencies
         run: npm ci --prefix web
       - name: Build dashboard
         run: npm run build --prefix web
-
   deploy:
     name: Deploy production
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -93,7 +94,7 @@ jobs:
           fi
       - name: Promote production
         if: steps.promotion-tip.outputs.current == 'true'
-        run: vercel promote "${{ steps.stage-production.outputs.url }}" --scope=uthens-projects --yes --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel promote "${{ steps.stage-production.outputs.url }}" --yes --scope="${{ secrets.VERCEL_ORG_ID }}" --token=${{ secrets.VERCEL_TOKEN }}
       - name: Confirm promoted SHA remains main
         if: steps.promotion-tip.outputs.current == 'true'
         shell: bash

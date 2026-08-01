@@ -38,6 +38,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       RETURNING id
     `;
 
+    const deletedLoginFailures = await sql`
+      DELETE FROM auth_login_failures
+      WHERE attempted_at < (NOW() - INTERVAL '24 hours')
+      RETURNING id
+    `;
+
     return res.status(200).json({
       ok: true,
       retention: '6 months',
@@ -45,6 +51,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         inspection_logs: deletedLogs.length,
         issue_reports: deletedIssues.length,
         audit_log: deletedAudit.length,
+        auth_login_failures: deletedLoginFailures.length,
       },
     });
   } catch (error: any) {

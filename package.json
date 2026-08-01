@@ -7,7 +7,9 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/*.test.mjs",
     "typecheck": "tsc --noEmit",
+    "migrate:020": "node scripts/migrate-020.js",
     "build:dashboard": "cd web && npm install && npm run build",
     "dev:dashboard": "cd web && npm install && npm run dev"
   },
