@@ -1,0 +1,73 @@
+# EAS mobile build archive — intentionally narrower than .gitignore.
+
+# Repository and deployment metadata
+.git/
+.github/
+.vercel/
+.expo/
+.claude/
+.cursor/
+.serena/
+.superpowers/
+.codex/
+.agents/
+
+# Dependencies and generated output
+node_modules/
+web/node_modules/
+web/.npm-cache/
+public/
+dist/
+web-build/
+expo-env.d.ts
+*.tsbuildinfo
+
+# Generated native folders
+/ios/
+/android/
+.kotlin/
+/downloads/
+
+# Server/dashboard sources are not part of the native application
+/api/
+/web/**
+!/web/branding.json
+/sql/
+/scripts/
+/tests/
+/store-assets/
+/docs/
+vercel.json
+
+# Secrets and local configuration
+.env
+.env.*
+.npmrc
+*.jks
+*.keystore
+*.p8
+*.p12
+*.pem
+*.key
+*.mobileprovision
+play-service-account.json
+appstore-connect-api-key.p8
+
+# Operational/customer data
+customer-data/
+customer-input/
+*.xlsx
+*.xls
+*.pptx
+*.csv
+*.tsv
+
+# Logs and local state
+*.orig.*
+*.log
+*.pid
+.metro-health-check*
+.DS_Store
+npm-debug.*
+yarn-debug.*
+yarn-error.*
