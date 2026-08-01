@@ -68,16 +68,16 @@ jobs:
         run: npm install --global vercel@latest
       - name: Pull production configuration
         if: steps.branch-tip.outputs.current == 'true'
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel pull --yes --environment=production --scope="${{ secrets.VERCEL_ORG_ID }}" --token=${{ secrets.VERCEL_TOKEN }}
       - name: Build production deployment
         if: steps.branch-tip.outputs.current == 'true'
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel build --prod --scope="${{ secrets.VERCEL_ORG_ID }}" --token=${{ secrets.VERCEL_TOKEN }}
       - name: Stage production deployment
         id: stage-production
         if: steps.branch-tip.outputs.current == 'true'
         shell: bash
         run: |
-          deployment_json="$(vercel deploy --prebuilt --prod --skip-domain --format=json --token=${{ secrets.VERCEL_TOKEN }})"
+          deployment_json="$(vercel deploy --prebuilt --prod --skip-domain --format=json --scope="${{ secrets.VERCEL_ORG_ID }}" --token=${{ secrets.VERCEL_TOKEN }})"
           deployment_url="$(jq -er '.deployment.url // .url' <<<"$deployment_json")"
           echo "url=$deployment_url" >> "$GITHUB_OUTPUT"
       - name: Reconfirm this SHA before promotion
