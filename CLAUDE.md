@@ -50,11 +50,11 @@ database**, not "migration pending". New write scripts must call `requireConfirm
 
 ## Workflow & governance
 
-- **Commands:** gate = `npm run typecheck` at the root + `npm run build:dashboard`.
-  There are NO test or lint scripts — the compiler is the whole net; report changes as
-  "builds and typechecks; untested by design" and read the full diff before pushing.
-  GitHub Actions runs both gates on every pull request and push to `main`; rely on CI
-  for the broad gate unless diagnosing a CI failure.
+- **Commands:** gate = `npm run typecheck` + `npm test` at the root + `npm run build:dashboard`.
+  There is NO lint script, and `npm test` is a single node:test file
+  (`tests/login-rate-limit.test.mjs`) — the compiler still carries most of the net, so read
+  the full diff before pushing. GitHub Actions runs all three gates on every pull request
+  and push to `main`; rely on CI for the broad gate unless diagnosing a CI failure.
 - **Tenancy:** every new domain query must be scoped by the JWT `companyId`. Admin means
   company admin, not cross-company platform admin.
 - **i18n:** UI strings exist in TWO files with non-corresponding keys
@@ -63,11 +63,25 @@ database**, not "migration pending". New write scripts must call `requireConfirm
   seed scripts) — NEVER `git add -A`; commit only your task's files by explicit
   pathspec. Parallel sessions are real: check `git status` + `git log -1` immediately
   before committing.
-- **Deploy:** a push to `main` starts a Vercel web production deploy after
-  GitHub Actions gates pass. A newer push cancels the superseded workflow, leaving
-  the newest green `main` SHA as the deployment candidate. Pull requests never deploy. Keep
-  `git.deploymentEnabled:false` in `vercel.json` to prevent a duplicate Vercel
-  Git deployment. Mobile (Expo/EAS) releases remain the user's call only.
+- **Deploy:** a push to `main` IS a production release — automatic, no human step, no
+  manual command. Never end a response with a `vercel deploy --prod` block for this repo;
+  the pipeline already deployed, and a manual run would only add a redundant second
+  deployment. **GitHub Actions is the ONLY production path.**
+  `.github/workflows/ci.yml` runs the gates, then `vercel build --prod` ->
+  `vercel deploy --prebuilt --prod --skip-domain` -> `vercel promote`. It re-checks that
+  the SHA is still the tip of `main` before building, before promoting, and after
+  promoting, so a superseded push is skipped. `concurrency: cancel-in-progress` keeps only
+  the newest run per ref, leaving the newest green `main` SHA as the deployment candidate.
+  The Vercel Git integration is still connected (`peuanthinsan/songdee-svis`, production
+  branch `main`) and still builds a **preview** for every non-`main` branch push, so pull
+  requests get a preview URL but never production. `vercel.json` sets
+  `git.deploymentEnabled: {"main": false}` to keep it out of production.
+  **Do not set that flag back to a bare `true`.** It was `true` from commit `8a01fd5`
+  until 2026-08-05, which armed both paths at once: every push to `main` produced TWO
+  production deployments of the same commit (verified: SHA `032ee6a` went out as `git` at
+  10:00:32 and again as `cli` at 10:15:53), and the Git one took the production alias
+  without waiting for the gates — so a red build could sit live until the Actions
+  promotion replaced it. Mobile (Expo/EAS) releases remain the user's call only.
 - **Models:** plan on Fable/Opus; code with Codex by default (codex-delegation skill — Codex prompts must forbid git); review/verify/git on Fable/Opus.
 
 ## Codex Delegation
