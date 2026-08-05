@@ -1,26 +1,86 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AdminUser, fetchAdminUsers, createAdminUser, updateAdminUser, deleteAdminUser } from '../../api';
 import { t } from '../../i18n';
+import { useDebounce } from '../../useDebounce';
 
 type Form = { username: string; password: string; firstName: string; lastName: string; role: string; fleetId: string };
 const BLANK: Form = { username: '', password: '', firstName: '', lastName: '', role: 'driver', fleetId: '' };
 
+const PAGE_LIMIT = 100;
+const ROLES = ['all', 'driver', 'supervisor', 'admin'];
+
 export function UsersTab() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
   const [modal, setModal] = useState<'create' | AdminUser | null>(null);
   const [form, setForm] = useState<Form>(BLANK);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [listError, setListError] = useState('');
+  const offsetRef = useRef(0);
+  const seqRef = useRef(0);
+  const debouncedSearch = useDebounce(search, 300);
 
-  function load(q?: string) {
-    setLoading(true);
-    fetchAdminUsers({ search: q, limit: 200 })
-      .then((data) => { setUsers(data); setLoading(false); })
-      .catch(() => { setError(t('error')); setLoading(false); });
+  function load(reset: boolean) {
+    // seq guards against a stale in-flight request landing after a newer one
+    // (filter/search change or Load more race) — dropped responses never touch state.
+    const seq = ++seqRef.current;
+    if (reset) {
+      setLoading(true);
+      // A reset supersedes any in-flight Load more; that response will be dropped
+      // by the seq check below and would otherwise never clear loadingMore itself.
+      setLoadingMore(false);
+    } else {
+      setLoadingMore(true);
+    }
+    setListError('');
+    const offset = reset ? 0 : offsetRef.current;
+    fetchAdminUsers({
+      limit: PAGE_LIMIT,
+      offset,
+      search: debouncedSearch.trim() || undefined,
+      role: roleFilter === 'all' ? undefined : roleFilter,
+    })
+      .then((data) => {
+        if (seq !== seqRef.current) return;
+        if (reset) {
+          setUsers(data);
+          offsetRef.current = data.length;
+        } else {
+          setUsers((prev) => {
+            const existingIds = new Set(prev.map((u) => u.id));
+            return [...prev, ...data.filter((u) => !existingIds.has(u.id))];
+          });
+          offsetRef.current = offset + data.length;
+        }
+        setHasMore(data.length >= PAGE_LIMIT);
+        setLoading(false);
+        setLoadingMore(false);
+      })
+      .catch(() => {
+        if (seq !== seqRef.current) return;
+        setListError(t('error'));
+        // A failed reset must not leave the previous filter's rows on screen —
+        // a later Load more would append the new filter onto stale data.
+        if (reset) setUsers([]);
+        setLoading(false);
+        setLoadingMore(false);
+      });
   }
-  useEffect(() => load(), []);
+  useEffect(() => {
+    offsetRef.current = 0;
+    setHasMore(true);
+    load(true);
+  }, [debouncedSearch, roleFilter]);
+
+  function loadMore() {
+    if (!hasMore || loading || loadingMore) return;
+    load(false);
+  }
 
   function openCreate() { setForm(BLANK); setModal('create'); setError(''); }
   function openEdit(u: AdminUser) {
@@ -32,17 +92,18 @@ export function UsersTab() {
     setSaving(true); setError('');
     try {
       if (modal === 'create') {
-        const u = await createAdminUser({ ...form, fleetId: form.fleetId || undefined });
-        setUsers((prev) => [u, ...prev]);
+        await createAdminUser({ ...form, fleetId: form.fleetId || undefined });
       } else if (modal) {
         const payload: Parameters<typeof updateAdminUser>[1] = {
           firstName: form.firstName, lastName: form.lastName, role: form.role, fleetId: form.fleetId || undefined,
         };
         if (form.password) payload.password = form.password;
-        const updated = await updateAdminUser(modal.id, payload);
-        setUsers((prev) => prev.map((u) => u.id === updated.id ? { ...u, ...updated } : u));
+        await updateAdminUser(modal.id, payload);
       }
       setModal(null);
+      offsetRef.current = 0;
+      setHasMore(true);
+      load(true);
     } catch (e: any) {
       setError(e.message || t('error'));
     } finally {
@@ -55,20 +116,27 @@ export function UsersTab() {
     try {
       await deleteAdminUser(u.id);
       setUsers((prev) => prev.filter((x) => x.id !== u.id));
+      // A deleted row shifts every later server row down by one offset position;
+      // without this, the next Load more re-fetches from the old offset and skips one user.
+      offsetRef.current = Math.max(0, offsetRef.current - 1);
     } catch (e: any) {
       alert(e.message || t('error'));
     }
   }
 
-  const roleLabel: Record<string, string> = { driver: t('driver'), supervisor: t('supervisor'), admin: t('admin') };
-  const filtered = users.filter((u) =>
-    !search || [u.username, u.first_name, u.last_name, u.fleet_id || ''].some((v) => v.toLowerCase().includes(search.toLowerCase()))
-  );
+  const roleLabel: Record<string, string> = { all: t('all'), driver: t('driver'), supervisor: t('supervisor'), admin: t('admin') };
 
   return (
     <div className="panel panel--flush">
-      <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 12, alignItems: 'center' }}>
+      <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <h2 style={{ margin: 0, flex: 1 }}>{t('adminUsers')}</h2>
+        <div className="chip-row">
+          {ROLES.map((r) => (
+            <button key={r} type="button" className={`chip${roleFilter === r ? ' chip--active' : ''}`} onClick={() => setRoleFilter(r)}>
+              {roleLabel[r]}
+            </button>
+          ))}
+        </div>
         <input
           placeholder={t('search')}
           value={search}
@@ -79,32 +147,42 @@ export function UsersTab() {
           + {t('add')}
         </button>
       </div>
+      {listError && <div className="alert alert--error" style={{ margin: 12 }}>{listError}</div>}
       {loading ? (
         <p className="muted" style={{ padding: 20 }}>{t('loading')}</p>
       ) : (
-        <table className="data-table">
-          <thead>
-            <tr><th>{t('username')}</th><th>{t('firstName')}</th><th>{t('lastName')}</th><th>{t('role')}</th><th>{t('fleetId')}</th><th></th></tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 && (
-              <tr><td colSpan={6} className="table-empty">{t('noResults')}</td></tr>
-            )}
-            {filtered.map((u) => (
-              <tr key={u.id}>
-                <td><strong>{u.username}</strong></td>
-                <td>{u.first_name}</td>
-                <td>{u.last_name}</td>
-                <td><span className="badge badge--open">{roleLabel[u.role] || u.role}</span></td>
-                <td className="muted">{u.fleet_id || '—'}</td>
-                <td style={{ whiteSpace: 'nowrap' }}>
-                  <button type="button" className="btn btn--secondary" style={{ padding: '5px 10px', marginRight: 6 }} onClick={() => openEdit(u)}>{t('editAction')}</button>
-                  <button type="button" className="btn" style={{ padding: '5px 10px', background: '#fde', color: '#c00' }} onClick={() => handleDelete(u)}>{t('deleteAction')}</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <>
+          <table className="data-table">
+            <thead>
+              <tr><th>{t('username')}</th><th>{t('firstName')}</th><th>{t('lastName')}</th><th>{t('role')}</th><th>{t('fleetId')}</th><th></th></tr>
+            </thead>
+            <tbody>
+              {users.length === 0 && (
+                <tr><td colSpan={6} className="table-empty">{t('noResults')}</td></tr>
+              )}
+              {users.map((u) => (
+                <tr key={u.id}>
+                  <td><strong>{u.username}</strong></td>
+                  <td>{u.first_name}</td>
+                  <td>{u.last_name}</td>
+                  <td><span className="badge badge--open">{roleLabel[u.role] || u.role}</span></td>
+                  <td className="muted">{u.fleet_id || '—'}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <button type="button" className="btn btn--secondary" style={{ padding: '5px 10px', marginRight: 6 }} onClick={() => openEdit(u)}>{t('editAction')}</button>
+                    <button type="button" className="btn" style={{ padding: '5px 10px', background: '#fde', color: '#c00' }} onClick={() => handleDelete(u)}>{t('deleteAction')}</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {hasMore && (
+            <div style={{ padding: 16, textAlign: 'center' }}>
+              <button type="button" className="btn btn--secondary" onClick={loadMore} disabled={loadingMore}>
+                {loadingMore ? t('loading') : t('loadMore')}
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {modal !== null && (

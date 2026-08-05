@@ -5,6 +5,8 @@ import { requireAdmin } from '../../../lib/admin-auth';
 import { BCRYPT_ROUNDS } from '../../../lib/api-auth';
 import { isNonEmptyString, MIN_PASSWORD_LENGTH } from '../../../lib/validate';
 
+const VALID_ROLES = ['driver', 'supervisor', 'admin'];
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const admin = await requireAdmin(req, res);
   if (!admin) return;
@@ -16,6 +18,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
       const offset = parseInt(req.query.offset as string) || 0;
       const { search, role } = req.query;
+      if (role && !VALID_ROLES.includes(role as string)) {
+        return res.status(400).json({ error: 'Invalid role' });
+      }
       let users;
       if (search && role) {
         const pattern = `%${search as string}%`;
@@ -25,7 +30,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           WHERE company_id = ${admin.companyId}
             AND role = ${role as string}
             AND (username ILIKE ${pattern} OR first_name ILIKE ${pattern} OR last_name ILIKE ${pattern} OR fleet_id ILIKE ${pattern})
-          ORDER BY role, first_name
+          ORDER BY CASE role WHEN 'admin' THEN 0 WHEN 'supervisor' THEN 1 ELSE 2 END, first_name, id
           LIMIT ${limit} OFFSET ${offset}
         `;
       } else if (search) {
@@ -35,7 +40,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           FROM users
           WHERE company_id = ${admin.companyId}
             AND (username ILIKE ${pattern} OR first_name ILIKE ${pattern} OR last_name ILIKE ${pattern} OR fleet_id ILIKE ${pattern})
-          ORDER BY role, first_name
+          ORDER BY CASE role WHEN 'admin' THEN 0 WHEN 'supervisor' THEN 1 ELSE 2 END, first_name, id
           LIMIT ${limit} OFFSET ${offset}
         `;
       } else if (role) {
@@ -43,7 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           SELECT id, username, first_name, last_name, role, fleet_id, created_at
           FROM users
           WHERE company_id = ${admin.companyId} AND role = ${role as string}
-          ORDER BY role, first_name
+          ORDER BY CASE role WHEN 'admin' THEN 0 WHEN 'supervisor' THEN 1 ELSE 2 END, first_name, id
           LIMIT ${limit} OFFSET ${offset}
         `;
       } else {
@@ -51,7 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           SELECT id, username, first_name, last_name, role, fleet_id, created_at
           FROM users
           WHERE company_id = ${admin.companyId}
-          ORDER BY role, first_name
+          ORDER BY CASE role WHEN 'admin' THEN 0 WHEN 'supervisor' THEN 1 ELSE 2 END, first_name, id
           LIMIT ${limit} OFFSET ${offset}
         `;
       }
@@ -71,7 +76,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (password.length < MIN_PASSWORD_LENGTH) {
       return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
     }
-    const VALID_ROLES = ['driver', 'supervisor', 'admin'];
     if (!VALID_ROLES.includes(role)) {
       return res.status(400).json({ error: 'Invalid role' });
     }
