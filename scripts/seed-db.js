@@ -4,6 +4,7 @@
  */
 const { neon } = require('@neondatabase/serverless');
 const { requireConfirmedTarget } = require('./lib/db-target');
+const { resolveCompany } = require('./lib/company-target');
 
 const vehicles = require('./data-vehicles.json');
 const emails = require('./data-emails.json');
@@ -42,9 +43,11 @@ async function seedDb() {
 
   const url = requireConfirmedTarget({ action: `sync ${desiredVehicles.length} vehicles`, dryRun });
   const sql = neon(url);
+  const company = await resolveCompany(sql);
   const existingRows = await sql`
     SELECT plate_number, vehicle_type, fleet_id, fleet_manager_email, is_active
     FROM vehicle_master
+    WHERE company_id = ${company.id}
   `;
   const existing = new Map(existingRows.map((vehicle) => [vehicle.plate_number, vehicle]));
   const inserts = desiredVehicles.filter((vehicle) => !existing.has(vehicle.plate));
@@ -60,7 +63,7 @@ async function seedDb() {
   console.log(`  deactivate: ${deactivations.length}`);
   for (const vehicle of deactivations) console.log(`  deactivate plate: ${vehicle.plate_number}`);
   console.log(`  unchanged: ${desiredVehicles.length - inserts.length - updates.length}`);
-  console.log(`  source vehicles: ${desiredVehicles.length}`);
+  console.log(`  source vehicles: ${desiredVehicles.length} (company: ${company.slug})`);
   console.log(`  fleets without fleet_manager_email: ${[...new Set(desiredVehicles.filter((vehicle) => !vehicle.managerEmail).map((vehicle) => vehicle.fleetId))].sort().join(', ')}`);
 
   if (dryRun) {
@@ -70,9 +73,9 @@ async function seedDb() {
 
   for (const vehicle of [...inserts, ...updates]) {
     await sql`
-      INSERT INTO vehicle_master (plate_number, vehicle_type, fleet_id, fleet_manager_email, region, is_active)
-      VALUES (${vehicle.plate}, ${vehicle.vehicleType}, ${vehicle.fleetId}, ${vehicle.managerEmail}, 'metro', true)
-      ON CONFLICT (plate_number) DO UPDATE SET
+      INSERT INTO vehicle_master (company_id, plate_number, vehicle_type, fleet_id, fleet_manager_email, region, is_active)
+      VALUES (${company.id}, ${vehicle.plate}, ${vehicle.vehicleType}, ${vehicle.fleetId}, ${vehicle.managerEmail}, 'metro', true)
+      ON CONFLICT (company_id, plate_number) DO UPDATE SET
         vehicle_type = EXCLUDED.vehicle_type,
         fleet_id = EXCLUDED.fleet_id,
         fleet_manager_email = COALESCE(EXCLUDED.fleet_manager_email, vehicle_master.fleet_manager_email),
@@ -80,7 +83,7 @@ async function seedDb() {
     `;
   }
   for (const vehicle of deactivations) {
-    await sql`UPDATE vehicle_master SET is_active = false WHERE plate_number = ${vehicle.plate_number}`;
+    await sql`UPDATE vehicle_master SET is_active = false WHERE company_id = ${company.id} AND plate_number = ${vehicle.plate_number}`;
   }
 
   console.log(`Vehicle sync complete: ${inserts.length} inserted, ${updates.length} updated, ${deactivations.length} deactivated.`);
