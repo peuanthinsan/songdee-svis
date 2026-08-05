@@ -56,7 +56,7 @@ async function seedUsers() {
 
   const url = requireConfirmedTarget({ action: `sync ${desiredUsers.length} users`, dryRun });
   const sql = neon(url);
-  const company = await resolveCompany(sql);
+  const company = await resolveCompany(sql, { dryRun });
   const existingRows = await sql`
     SELECT username, first_name, last_name, role, fleet_id, is_active
     FROM users
