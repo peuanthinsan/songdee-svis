@@ -13,7 +13,7 @@ async function run() {
     process.exit(1);
   }
 
-  const url = requireConfirmedTarget({ action: 'reset the password of EVERY user' });
+  const { url } = requireConfirmedTarget({ action: 'reset the password of EVERY user' });
   const sql = neon(url);
   const users = await sql`SELECT id, username FROM users`;
   if (users.length === 0) {

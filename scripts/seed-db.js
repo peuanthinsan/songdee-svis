@@ -41,7 +41,7 @@ async function seedDb() {
   const plates = new Set(desiredVehicles.map((vehicle) => vehicle.plate));
   if (plates.size !== desiredVehicles.length) throw new Error('data-vehicles.json contains duplicate plates');
 
-  const url = requireConfirmedTarget({ action: `sync ${desiredVehicles.length} vehicles`, dryRun });
+  const { url } = requireConfirmedTarget({ action: `sync ${desiredVehicles.length} vehicles`, dryRun });
   const sql = neon(url);
   const company = await resolveCompany(sql, { dryRun });
   const existingRows = await sql`
