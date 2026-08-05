@@ -94,14 +94,45 @@ database**, not "migration pending". New write scripts must call `requireConfirm
   there, since two armed paths produce two racing production deployments of the same
   commit and whichever finishes last wins. This was the real state from commit `8a01fd5`
   until 2026-08-05 (verified: SHA `032ee6a` went out as `git` at 10:00:32 and again as
-  `cli` at 10:15:53). **History warning:** on 2026-08-05 commit `18bee72` set
+  `cli` at 10:15:53). **What gates production (2026-08-05):** Vercel does NOT wait for
+  Actions — it starts building seconds after the commit lands, while gates take ~40s. So
+  the gate is on what ENTERS `main`, not on the deploy: branch protection on `main`
+  requires the `gates` check, with `strict: true` (the branch must be up to date with
+  `main`, so the tree that passed gates is the tree that lands) and `enforce_admins: true`
+  (no bypass, including for the repo owner). State the guarantee precisely, because it is
+  narrower than "everything goes through a PR" AND narrower than "every landed SHA was
+  checked": **what is guaranteed is the tree, not the SHA — the content that lands on
+  `main` is content that passed `gates`.** GitHub evaluates required checks against the PR
+  *head* SHA; the merge button then creates a brand-new merge commit that carries no checks
+  of its own, and `gates` runs on that merge SHA only afterwards, as a report. `strict:
+  true` is what makes this sound: with the branch up to date, the merge commit's tree is
+  identical to the tested head's tree (verified 2026-08-05 — `merge^{tree}` ==
+  `merge^2^{tree}` on `cd13c69`, `3c56533`, and `c03d855`). Do NOT restate this as a
+  per-SHA guarantee; that is false for every merge-button landing, which is how all of
+  PR #8–#14 landed. `required_pull_request_reviews` is deliberately `null` — a solo
+  maintainer cannot self-approve, so requiring review would deadlock `main`. Consequence: a
+  fresh local commit is rejected outright (no check exists for its SHA), while the green
+  head of an open PR *can* be fast-forwarded straight to `main` without the merge button,
+  because that SHA already carries the check. The remaining limit: this gates entry to
+  `main` only, and
+  anything that reaches `main` deploys immediately regardless. Weakening `strict` or
+  `enforce_admins`, or an admin editing or deleting the protection rule itself, re-opens
+  the ungated path to production. **History warning:** on 2026-08-05 commit `18bee72` set
   `git.deploymentEnabled` to `{"main": false}` to disarm the duplicate, but the Actions
-  deploy job it left as the sole path was already broken (dead `VERCEL_TOKEN`/scope:
-  "You do not have access to the specified account"). That killed production deploys
-  outright and stranded `main` two commits ahead of production. Do not disable the Git path
-  again unless an alternative path has been verified working first. Branch protection on
-  `main` requires the `gates` check before merge, but `enforce_admins` is off, so admins
-  can still bypass it — it is not an absolute barrier. Vercel promotes by
+  deploy job it left as the sole path was already broken. Most consistent explanation —
+  inferred, not proven: the `VERCEL_TOKEN` secret lost team access about four days after
+  being minted, giving "You do not have access to the specified account" where the earlier
+  failure had said "token ... is not valid". What was actually tested: both
+  `team_1ZYOKeXRL8nUJkgFD8pCksSt` and `uthens-projects` resolve fine as `--scope` values
+  against a valid credential. What was NOT tested: the secret itself (GitHub secrets cannot
+  be read back), and the CLI version that actually failed — the scope test ran on 58.0.0
+  while the failing job installed 58.5.1 via unpinned `vercel@latest`, so a CLI regression
+  is not fully excluded, and if it were one then the unpinned install is itself the bug.
+  That broken sole path killed production deploys outright and stranded `main` two commits
+  ahead of production. Do not assume a non-expiring token makes an Actions-owned path safe — access
+  can be lost without expiry; verify any such path actually deploys before relying on it,
+  and do not disable the Git path again unless an alternative has been verified working
+  first. Vercel promotes by
   build-completion order, not commit order: if two merges land seconds apart and the older
   commit's build finishes last, production serves the OLDER commit; branch protection does
   not fix this, so after rapid back-to-back merges, verify the deployed SHA and redeploy if
