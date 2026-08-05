@@ -50,11 +50,17 @@ database**, not "migration pending". New write scripts must call `requireConfirm
 
 ## Workflow & governance
 
-- **Commands:** gate = `npm run typecheck` at the root + `npm run build:dashboard`.
-  There are NO test or lint scripts — the compiler is the whole net; report changes as
-  "builds and typechecks; untested by design" and read the full diff before pushing.
-  GitHub Actions runs both gates on every pull request and push to `main`; rely on CI
-  for the broad gate unless diagnosing a CI failure.
+- **Commands:** gate = `npm run typecheck` at the root + `npm test` + `npm run build:dashboard`.
+  There is no lint script. `npm test` runs `node --test tests/*.test.mjs`. GitHub Actions
+  runs all three on every pull request and push to `main` (see `.github/workflows/ci.yml`);
+  rely on CI for the broad gate unless diagnosing a CI failure. Read the full diff before
+  pushing.
+  **Know what the gate does NOT cover.** `tsconfig.json` includes only `**/*.ts` and
+  `**/*.tsx` with `allowJs` unset, so `tsc --noEmit` never reads a `.js` file — nothing in
+  `scripts/` is compiled by anything, and `build:dashboard` only builds `web/`. A change
+  confined to `scripts/` passes the entire gate whether it works or not. Prove that code
+  by running it and asserting on the observable behaviour; do not report "typechecks" as
+  if it were coverage.
 - **Tenancy:** every new domain query must be scoped by the JWT `companyId`. Admin means
   company admin, not cross-company platform admin.
 - **i18n:** UI strings exist in TWO files with non-corresponding keys
