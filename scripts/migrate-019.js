@@ -1,12 +1,14 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { neon } = require('@neondatabase/serverless');
-require('dotenv').config({ path: '.env.local' });
+const { requireConfirmedTarget } = require('./lib/db-target');
 
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) {
-  throw new Error('DATABASE_URL is not configured');
-}
+const dryRun = process.argv.includes('--dry-run');
+
+const databaseUrl = requireConfirmedTarget({
+  action: 'apply migration 019 (multi-company SVIS tenancy)',
+  dryRun,
+});
 
 const migrationPath = path.join(
   __dirname,
@@ -24,6 +26,10 @@ const statements = fs
   .filter((statement) => !['BEGIN', 'COMMIT'].includes(statement.toUpperCase()));
 
 (async () => {
+  if (dryRun) {
+    console.log(`Dry run: would apply migration 019 in one transaction (${statements.length} statements). No writes performed.`);
+    process.exit(0);
+  }
   const sql = neon(databaseUrl);
 
   console.log(`Applying migration 019 in one transaction (${statements.length} statements)...`);
