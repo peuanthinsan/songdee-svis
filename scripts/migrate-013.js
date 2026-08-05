@@ -18,7 +18,7 @@ async function safe(label, fn) {
 }
 
 (async () => {
-  const url = requireConfirmedTarget({
+  const { url } = requireConfirmedTarget({
     action: 'apply migration 013 (post_route frequency, mileage + odometer photo columns)',
     dryRun,
   });

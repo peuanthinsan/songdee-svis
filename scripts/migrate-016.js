@@ -4,7 +4,7 @@ const { requireConfirmedTarget } = require('./lib/db-target');
 const dryRun = process.argv.includes('--dry-run');
 
 (async () => {
-  const url = requireConfirmedTarget({
+  const { url } = requireConfirmedTarget({
     action: 'apply migration 016 (vendor_email, vendor_notified_at)',
     dryRun,
   });

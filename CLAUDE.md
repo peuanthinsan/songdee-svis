@@ -55,21 +55,26 @@ database**, not "migration pending". New write scripts must call `requireConfirm
   a new `tests/*.test.mjs` file is picked up automatically. Read the full diff before pushing.
   GitHub Actions runs all three gates on every pull request and push to `main`; rely on CI for
   the broad gate unless diagnosing a CI failure.
-  **Know what the gate does NOT cover.** `tsconfig.json` includes only `**/*.ts` and
-  `**/*.tsx` with `allowJs` unset, so `tsc --noEmit` never reads a `.js` file — nothing in
-  `scripts/` is compiled by anything, and `build:dashboard` only builds `web/`. A change
+  **Know what the gate does NOT cover.** `tsconfig.json`'s `include` lists only `**/*.ts` and
+  `**/*.tsx`, so no `.js` file is ever matched and `tsc --noEmit` never reads one — nothing in
+  `scripts/` is compiled by anything, and `build:dashboard` only builds `web/`. (Note it is the
+  `include` globs that do this, NOT `allowJs`: the repo extends `expo/tsconfig.base`, which sets
+  `allowJs: true`. `allowJs` only *permits* a `.js` file to compile once matched; it never adds
+  one. Verify with `npx tsc --noEmit --listFiles | grep /scripts/` — zero hits.) A change
   confined to `scripts/` passes typecheck and build whether it works or not. Prove that code
   by running it and asserting on the observable behaviour; do not report "typechecks" as
   if it were coverage.
-  The one exception is the `.env.local`/wrong-database guard: `tests/db-target-guard.test.mjs`
-  spawns every script that calls `requireConfirmedTarget()` against a fake host and asserts
-  each one refuses before connecting. Its classification matrix is derived from disk by a
-  recursive scan, so **adding a new guard-calling script anywhere under `scripts/` fails that
-  suite until you classify it** by whether it connects during `--dry-run`. That suite is a
-  complete net for scripts that return before connecting, and only a partial one for the three
-  that legitimately read during `--dry-run` (`seed-db.js`, `seed-users-postgres.js`,
-  `wipe-history.js`) — see its header comment for the exact limits. Every other `.js` file
-  under `scripts/` still has no automated coverage at all.
+  Two parts of `scripts/` do have real coverage. `tests/company-target.test.mjs` unit-tests
+  `scripts/lib/company-target.js` (tenant selection). And `tests/db-target-guard.test.mjs`
+  covers the `.env.local`/wrong-database guard: it spawns every script that calls
+  `requireConfirmedTarget()` against a fake host and asserts each one refuses before
+  connecting. Its classification matrix is derived from disk by a recursive scan, so **adding a
+  new guard-calling script anywhere under `scripts/` fails that suite until you classify it**
+  by whether it connects during `--dry-run`. That suite is a complete net for scripts that
+  return before connecting, and only a partial one for the three that legitimately read during
+  `--dry-run` (`seed-db.js`, `seed-users-postgres.js`, `wipe-history.js`) — see its header
+  comment for the exact limits. Every other `.js` file under `scripts/` has no automated
+  coverage at all.
 - **Tenancy:** every new domain query must be scoped by the JWT `companyId`. Admin means
   company admin, not cross-company platform admin.
 - **i18n:** UI strings exist in TWO files with non-corresponding keys

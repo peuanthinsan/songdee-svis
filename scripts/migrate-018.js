@@ -2,11 +2,11 @@ const { neon } = require('@neondatabase/serverless');
 const { requireConfirmedTarget } = require('./lib/db-target');
 
 (async () => {
-  const url = requireConfirmedTarget({
+  const { url, dryRun } = requireConfirmedTarget({
     action: 'apply migration 018 (e_bike type, is_active flags, van/e_bike checklists)',
     dryRun: process.argv.includes('--dry-run'),
   });
-  if (process.argv.includes('--dry-run')) {
+  if (dryRun) {
     console.log('Dry run: migration 018 not applied.');
     process.exit(0);
   }

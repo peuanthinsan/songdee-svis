@@ -8,7 +8,7 @@ async function run() {
     console.error('Set SVIS_ADMIN_PASSWORD in your local environment before running this script.');
     process.exit(1);
   }
-  const url = requireConfirmedTarget({ action: 'reset EVERY admin password' });
+  const { url } = requireConfirmedTarget({ action: 'reset EVERY admin password' });
   const sql = neon(url);
 
   const admins = await sql`SELECT id, username FROM users WHERE role = 'admin'`;

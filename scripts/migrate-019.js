@@ -5,7 +5,7 @@ const { requireConfirmedTarget } = require('./lib/db-target');
 
 const dryRun = process.argv.includes('--dry-run');
 
-const databaseUrl = requireConfirmedTarget({
+const { url: databaseUrl } = requireConfirmedTarget({
   action: 'apply migration 019 (multi-company SVIS tenancy)',
   dryRun,
 });

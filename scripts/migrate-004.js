@@ -5,7 +5,7 @@ const { requireConfirmedTarget } = require('./lib/db-target');
 const dryRun = process.argv.includes('--dry-run');
 
 async function run() {
-  const url = requireConfirmedTarget({ action: 'apply migration 004 (users table)', dryRun });
+  const { url } = requireConfirmedTarget({ action: 'apply migration 004 (users table)', dryRun });
   const schema = fs.readFileSync('sql/004-users.sql', 'utf8');
   const statements = schema.split(';').map(s => s.trim()).filter(s => s.length > 0);
   if (dryRun) {

@@ -18,7 +18,7 @@ async function safe(label, fn) {
 }
 
 (async () => {
-  const url = requireConfirmedTarget({
+  const { url } = requireConfirmedTarget({
     action: 'apply migration 014 (app_settings table)',
     dryRun,
   });

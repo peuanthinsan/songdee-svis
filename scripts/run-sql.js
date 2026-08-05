@@ -29,7 +29,7 @@ async function runStatements(sql, filePath) {
 }
 
 async function run() {
-  const url = requireConfirmedTarget({
+  const { url } = requireConfirmedTarget({
     action: 'apply sql/001-schema.sql, sql/002-rls.sql and sql/003-seed.sql',
     dryRun,
   });
