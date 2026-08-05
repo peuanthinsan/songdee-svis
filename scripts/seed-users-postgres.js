@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const fs = require('fs');
 const path = require('path');
 const { requireConfirmedTarget } = require('./lib/db-target');
+const { resolveCompany } = require('./lib/company-target');
 
 const usersFile = process.env.SVIS_USERS_FILE || path.join(__dirname, 'data-users.json');
 const seedPassword = process.env.SVIS_SEED_PASSWORD;
@@ -55,9 +56,11 @@ async function seedUsers() {
 
   const url = requireConfirmedTarget({ action: `sync ${desiredUsers.length} users`, dryRun });
   const sql = neon(url);
+  const company = await resolveCompany(sql);
   const existingRows = await sql`
     SELECT username, first_name, last_name, role, fleet_id, is_active
     FROM users
+    WHERE company_id = ${company.id}
   `;
   const existing = new Map(existingRows.map((user) => [user.username, user]));
   const inserts = desiredUsers.filter((user) => !existing.has(user.username));
@@ -75,7 +78,7 @@ async function seedUsers() {
   console.log(`  deactivate: ${deactivations.length}`);
   for (const user of deactivations) console.log(`  deactivate username: ${user.username}`);
   console.log(`  unchanged: ${desiredUsers.length - inserts.length - updates.length}`);
-  console.log(`  source users: ${desiredUsers.length}`);
+  console.log(`  source users: ${desiredUsers.length} (company: ${company.slug})`);
 
   if (dryRun) {
     console.log('Dry run complete; no writes performed.');
@@ -89,9 +92,9 @@ async function seedUsers() {
   const hash = await bcrypt.hash(seedPassword, 12);
   for (const user of [...inserts, ...updates]) {
     await sql`
-      INSERT INTO users (username, password_hash, first_name, last_name, role, fleet_id, is_active)
-      VALUES (${user.username}, ${hash}, ${user.firstName}, ${user.lastName}, ${user.role}, ${user.fleetId}, true)
-      ON CONFLICT (username) DO UPDATE SET
+      INSERT INTO users (company_id, username, password_hash, first_name, last_name, role, fleet_id, is_active)
+      VALUES (${company.id}, ${user.username}, ${hash}, ${user.firstName}, ${user.lastName}, ${user.role}, ${user.fleetId}, true)
+      ON CONFLICT (company_id, username) DO UPDATE SET
         first_name = EXCLUDED.first_name,
         last_name = EXCLUDED.last_name,
         role = EXCLUDED.role,
@@ -101,7 +104,7 @@ async function seedUsers() {
     `;
   }
   for (const user of deactivations) {
-    await sql`UPDATE users SET is_active = false, updated_at = NOW() WHERE username = ${user.username}`;
+    await sql`UPDATE users SET is_active = false, updated_at = NOW() WHERE company_id = ${company.id} AND username = ${user.username}`;
   }
 
   console.log(`User sync complete: ${inserts.length} inserted, ${updates.length} updated, ${deactivations.length} deactivated.`);
