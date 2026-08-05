@@ -21,9 +21,7 @@
     }
   ],
   "git": {
-    "deploymentEnabled": {
-      "main": false
-    }
+    "deploymentEnabled": true
   },
   "regions": [
     "sin1"
