@@ -129,6 +129,7 @@ function buildChildEnv(overrides = {}) {
   const env = { ...process.env };
   delete env.DATABASE_URL;
   delete env.LEAK_CANARY_SELF_TEST;
+  delete env.SVIS_COMPANY_SLUG;
   delete env.SVIS_USERS_FILE;
   return {
     ...env,
