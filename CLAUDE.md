@@ -51,10 +51,25 @@ database**, not "migration pending". New write scripts must call `requireConfirm
 ## Workflow & governance
 
 - **Commands:** gate = `npm run typecheck` + `npm test` at the root + `npm run build:dashboard`.
-  There is NO lint script. `npm test` runs `node --test` over `tests/*.test.mjs` — the
-  compiler still carries most of the net, so read the full diff before pushing. GitHub
-  Actions runs all three gates on every pull request and push to `main`; rely on CI for the
-  broad gate unless diagnosing a CI failure.
+  There is NO lint script. `npm test` runs `node --test` over `tests/*.test.mjs` — a glob, so
+  a new `tests/*.test.mjs` file is picked up automatically. Read the full diff before pushing.
+  GitHub Actions runs all three gates on every pull request and push to `main`; rely on CI for
+  the broad gate unless diagnosing a CI failure.
+  **Know what the gate does NOT cover.** `tsconfig.json` includes only `**/*.ts` and
+  `**/*.tsx` with `allowJs` unset, so `tsc --noEmit` never reads a `.js` file — nothing in
+  `scripts/` is compiled by anything, and `build:dashboard` only builds `web/`. A change
+  confined to `scripts/` passes typecheck and build whether it works or not. Prove that code
+  by running it and asserting on the observable behaviour; do not report "typechecks" as
+  if it were coverage.
+  The one exception is the `.env.local`/wrong-database guard: `tests/db-target-guard.test.mjs`
+  spawns every script that calls `requireConfirmedTarget()` against a fake host and asserts
+  each one refuses before connecting. Its classification matrix is derived from disk by a
+  recursive scan, so **adding a new guard-calling script anywhere under `scripts/` fails that
+  suite until you classify it** by whether it connects during `--dry-run`. That suite is a
+  complete net for scripts that return before connecting, and only a partial one for the three
+  that legitimately read during `--dry-run` (`seed-db.js`, `seed-users-postgres.js`,
+  `wipe-history.js`) — see its header comment for the exact limits. Every other `.js` file
+  under `scripts/` still has no automated coverage at all.
 - **Tenancy:** every new domain query must be scoped by the JWT `companyId`. Admin means
   company admin, not cross-company platform admin.
 - **i18n:** UI strings exist in TWO files with non-corresponding keys
