@@ -12,6 +12,10 @@ const detailSource = readFileSync(
   new URL('../app/(app)/vehicles/[id]/index.tsx', import.meta.url),
   'utf8',
 );
+const vehicleMapSource = readFileSync(
+  new URL('../components/VehicleMap.tsx', import.meta.url),
+  'utf8',
+);
 
 function loadInspectionHandler(sqlCalls) {
   const output = ts.transpileModule(apiSource, {
@@ -134,4 +138,16 @@ test('inspection screens keep records isolated and rehydrate saved answers by it
   assert.match(editorSource, /frequency !== 'post_route'/);
   assert.doesNotMatch(editorSource, /styles\.allPassRow/);
   assert.match(detailSource, /&frequency=daily/);
+});
+
+test('vehicle diagram controls render filtered checklist tabs instead of section jumps', () => {
+  assert.match(editorSource, /activeZoneSections[\s\S]*checklistItems\.filter/);
+  assert.match(editorSource, /onZonePress=\{\(zone\) => selectZone\(zone\)\}/);
+  assert.match(editorSource, /onAllZonesPress=\{\(\) => selectZone\(null\)\}/);
+  assert.match(editorSource, /scrollTo\(\{ y: 0, animated: false \}\)/);
+  assert.match(editorSource, /ref=\{checklistScrollRef\}/);
+  assert.match(vehicleMapSource, /accessibilityRole="tab"/);
+  assert.match(vehicleMapSource, /accessibilityState=\{\{ selected:/);
+  assert.match(vehicleMapSource, /allZonesLabel/);
+  assert.doesNotMatch(editorSource, /current === zone \? null : zone/);
 });

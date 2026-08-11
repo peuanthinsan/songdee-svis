@@ -145,15 +145,22 @@ export type DashboardData = {
 
 export type InspectionDetail = {
   id: string;
+  vehicle_id?: string;
+  inspector_id?: string;
   plate_number: string;
   overall_status: string;
   inspection_date: string;
+  frequency?: 'daily' | 'weekly' | 'post_route';
   inspector_name?: string;
   mileage?: number;
   photo_urls?: string[];
   odometer_photo_url?: string | null;
+  vehicle_usable?: boolean | null;
+  notes?: string;
+  created_at?: string;
   results?: Array<{
     id: string;
+    checklist_item_id?: string;
     result: string;
     photo_urls?: string[];
     notes?: string;
@@ -216,6 +223,118 @@ export function fetchIssues(status?: string, fleetId?: string) {
 
 export function fetchInspectionDetail(id: string) {
   return apiFetch<InspectionDetail>(`/api/inspections/${encodeURIComponent(id)}`);
+}
+
+export type InspectionVehicle = {
+  id: string;
+  plate_number: string;
+  vehicle_type: VehicleTypeKey;
+  fleet_id: string;
+  daily_status: 'checked' | 'pending';
+  daily_result?: 'pass' | 'fail' | null;
+  daily_checked_by?: string | null;
+  weekly_status: 'checked' | 'pending';
+  today_status: 'checked' | 'pending';
+  overall_status?: 'pass' | 'fail' | null;
+  checked_by?: string | null;
+};
+
+export type InspectionChecklistItem = ChecklistItem & {
+  section?: 'front' | 'rear' | 'sides' | 'top' | 'underbody' | 'cabin' | 'cargo' | 'documents' | 'supplies' | null;
+};
+
+export type VehicleInspectionLog = InspectionDetail & {
+  vehicle_id: string;
+  inspector_id: string;
+  frequency: 'daily' | 'weekly' | 'post_route';
+  results: Array<{
+    id?: string;
+    checklist_item_id: string;
+    result: 'pass' | 'fail';
+    photo_urls?: string[];
+    notes?: string;
+    item_name_th?: string;
+    item_name_en?: string;
+  }>;
+};
+
+export function fetchInspectionVehicles(params?: { limit?: number; offset?: number; search?: string; signal?: AbortSignal }) {
+  const qs = new URLSearchParams();
+  if (params?.limit) qs.set('limit', String(params.limit));
+  if (params?.offset) qs.set('offset', String(params.offset));
+  if (params?.search) qs.set('search', params.search);
+  const query = qs.toString();
+  return apiFetch<{ vehicles: InspectionVehicle[]; total: number; limit: number; offset: number }>(
+    `/api/vehicles${query ? `?${query}` : ''}`,
+    { signal: params?.signal },
+  );
+}
+
+export function fetchInspectionChecklist(vehicleType: VehicleTypeKey, frequency: 'daily' | 'weekly' | 'post_route', signal?: AbortSignal) {
+  const qs = new URLSearchParams({ vehicleType, frequency });
+  return apiFetch<InspectionChecklistItem[]>(`/api/checklist?${qs}`, { signal });
+}
+
+export function fetchVehicleInspections(vehicleId: string, params?: URLSearchParams, signal?: AbortSignal) {
+  const qs = params ? new URLSearchParams(params) : new URLSearchParams();
+  qs.set('vehicleId', vehicleId);
+  return apiFetch<VehicleInspectionLog[]>(`/api/inspections?${qs}`, { signal });
+}
+
+export function fetchInspectionCarryover(vehicleId: string, signal?: AbortSignal) {
+  const qs = new URLSearchParams({ vehicleId, carryover: '1' });
+  return apiFetch<{ items: Array<{ checklist_item_id: string; item_name_th: string; item_name_en: string }> }>(
+    `/api/inspections?${qs}`,
+    { signal },
+  );
+}
+
+export type InspectionResultInput = {
+  checklistItemId: string;
+  result: 'pass' | 'fail';
+  photoUrls: string[];
+  notes: string;
+};
+
+export type InspectionSubmission = {
+  vehicleId: string;
+  inspectionDate: string;
+  frequency: 'daily' | 'weekly' | 'post_route';
+  results: InspectionResultInput[];
+  photoUrls: string[];
+  notes: string;
+  mileage: number;
+  odometerPhotoUrl: string;
+  vehicleUsable: boolean;
+};
+
+export function createInspection(data: InspectionSubmission) {
+  return apiFetch<{
+    inspectionId?: string;
+    existingInspectionId?: string;
+    overallStatus?: 'pass' | 'fail';
+    issueId?: string | null;
+  }>('/api/inspections', { method: 'POST', body: JSON.stringify(data) });
+}
+
+export function updateInspection(inspectionId: string, data: Omit<InspectionSubmission, 'vehicleId' | 'inspectionDate' | 'frequency'>) {
+  return apiFetch<{ inspectionId: string; overallStatus: 'pass' | 'fail' }>('/api/inspections', {
+    method: 'PUT',
+    body: JSON.stringify({ inspectionId, ...data }),
+  });
+}
+
+export function uploadInspectionPhoto(file: File) {
+  const extension = file.type === 'image/png' ? 'png' : 'jpg';
+  const safeBase = file.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 48) || 'photo';
+  const suffix = Math.random().toString(36).slice(2, 9);
+  const filename = `inspection-${Date.now()}-${suffix}-${safeBase}.${extension}`;
+  const body = new FormData();
+  body.append('file', file, filename);
+  return apiFetch<{ url: string }>(`/api/upload?filename=${encodeURIComponent(filename)}`, {
+    method: 'POST',
+    body,
+  });
 }
 
 export type GpsStatus = 'running' | 'stopped' | 'offline';
