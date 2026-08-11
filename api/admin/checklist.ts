@@ -11,8 +11,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET') {
     try {
       const { vehicleType, frequency } = req.query;
-      const limit = Math.min(parseInt(req.query.limit as string) || 200, 500);
-      const offset = parseInt(req.query.offset as string) || 0;
+      const returnAll = req.query.all === '1';
+      // PostgreSQL treats LIMIT NULL as unlimited. Editors use this one-shot
+      // snapshot so concurrent checklist mutations cannot shift OFFSET pages.
+      const limit = returnAll
+        ? null
+        : Math.min(parseInt(req.query.limit as string) || 500, 500);
+      const offset = returnAll ? 0 : (parseInt(req.query.offset as string) || 0);
       let items;
       if (vehicleType && frequency) {
         items = await sql`
@@ -20,7 +25,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           WHERE company_id = ${admin.companyId}
             AND vehicle_type = ${vehicleType as string}
             AND frequency = ${frequency as string}
-          ORDER BY sort_order
+          ORDER BY sort_order, id
           LIMIT ${limit} OFFSET ${offset}
         `;
       } else if (vehicleType) {
@@ -28,14 +33,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           SELECT * FROM checklist_items
           WHERE company_id = ${admin.companyId}
             AND vehicle_type = ${vehicleType as string}
-          ORDER BY frequency, sort_order
+          ORDER BY frequency, sort_order, id
           LIMIT ${limit} OFFSET ${offset}
         `;
       } else {
         items = await sql`
           SELECT * FROM checklist_items
           WHERE company_id = ${admin.companyId}
-          ORDER BY vehicle_type, frequency, sort_order
+          ORDER BY frequency, vehicle_type, sort_order, id
           LIMIT ${limit} OFFSET ${offset}
         `;
       }
