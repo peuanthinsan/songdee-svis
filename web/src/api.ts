@@ -52,6 +52,21 @@ export type LoginResponse = {
   };
 };
 
+export type LoginAccount = {
+  username: string;
+  displayName: string;
+  role: 'driver' | 'supervisor' | 'admin';
+};
+
+export function fetchLoginUsers(companySlug: string) {
+  return apiFetch<{
+    drivers: string[];
+    staff: string[];
+    driverAccounts: LoginAccount[];
+    staffAccounts: LoginAccount[];
+  }>(`/api/auth/users-list?company=${encodeURIComponent(companySlug)}`);
+}
+
 export type Company = {
   slug: string;
   name: string;
