@@ -1,7 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../AuthContext';
-import { ApiError, ChecklistItem, fetchAdminChecklist, createChecklistItem, updateChecklistItem, deleteChecklistItem } from '../../api';
+import {
+  ApiError,
+  ChecklistItem,
+  createChecklistItem,
+  deleteChecklistItem,
+  fetchAdminChecklist,
+  reorderChecklistItems,
+  updateChecklistItem,
+} from '../../api';
 import {
   CHECKLIST_FREQUENCIES,
   CHECKLIST_VEHICLE_TYPES,
@@ -9,10 +17,37 @@ import {
   type ChecklistFrequency,
 } from '../../checklist-groups';
 import { getLang, t } from '../../i18n';
+import { ChecklistImportDialog } from './ChecklistImportDialog';
 
 type VehicleType = ChecklistItem['vehicle_type'];
 type Form = { itemNameTh: string; itemNameEn: string; vehicleType: VehicleType; frequency: ChecklistFrequency; sortOrder: string };
 const BLANK: Form = { itemNameTh: '', itemNameEn: '', vehicleType: 'car', frequency: 'daily', sortOrder: '0' };
+
+function SearchIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <circle cx="10.5" cy="10.5" r="6.5" /><path d="m15.5 15.5 4 4" />
+    </svg>
+  );
+}
+
+function UploadIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 16V4" /><path d="m7.5 8.5 4.5-4.5 4.5 4.5" /><path d="M5 14.5v3.25A2.25 2.25 0 0 0 7.25 20h9.5A2.25 2.25 0 0 0 19 17.75V14.5" />
+    </svg>
+  );
+}
+
+function DragHandleIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 18 24" width="16" height="20" fill="currentColor">
+      <circle cx="5" cy="6" r="1.5" /><circle cx="13" cy="6" r="1.5" />
+      <circle cx="5" cy="12" r="1.5" /><circle cx="13" cy="12" r="1.5" />
+      <circle cx="5" cy="18" r="1.5" /><circle cx="13" cy="18" r="1.5" />
+    </svg>
+  );
+}
 
 export function ChecklistTab() {
   const [items, setItems] = useState<ChecklistItem[]>([]);
@@ -25,6 +60,11 @@ export function ChecklistTab() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [loadError, setLoadError] = useState('');
+  const [importOpen, setImportOpen] = useState(false);
+  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+  const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
+  const [orderStatus, setOrderStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [notice, setNotice] = useState('');
   const loadRequestRef = useRef(0);
   const navigate = useNavigate();
   const { signOut } = useAuth();
@@ -72,7 +112,16 @@ export function ChecklistTab() {
   async function handleSave() {
     setSaving(true); setError('');
     try {
-      const sortOrder = parseInt(form.sortOrder) || 0;
+      let sortOrder = parseInt(form.sortOrder) || 0;
+      if (
+        modal !== 'create'
+        && modal
+        && (modal.frequency !== form.frequency || modal.vehicle_type !== form.vehicleType)
+      ) {
+        sortOrder = items
+          .filter((item) => item.vehicle_type === form.vehicleType && item.frequency === form.frequency)
+          .reduce((max, item) => Math.max(max, item.sort_order), 0) + 1;
+      }
       if (modal === 'create') {
         await createChecklistItem({ ...form, sortOrder });
       } else if (modal) {
@@ -82,6 +131,7 @@ export function ChecklistTab() {
       setActiveFrequency(form.frequency);
       setActiveVehicleType(form.vehicleType);
       await load();
+      setNotice(t('saved'));
     } catch (e: any) {
       setError(e.message || t('error'));
     } finally {
@@ -107,6 +157,63 @@ export function ChecklistTab() {
   );
   const activeFrequencyGroup = groupedItems.find((group) => group.frequency === activeFrequency);
   const activeItems = activeFrequencyGroup?.vehicleGroups.find((group) => group.vehicleType === activeVehicleType)?.items ?? [];
+  const canReorder = search.trim() === '' && orderStatus !== 'saving';
+
+  async function commitOrder(nextItems: ChecklistItem[]) {
+    const previousItems = items;
+    const orderById = new Map(nextItems.map((item, index) => [item.id, index + 1]));
+    setItems((current) => current.map((item) => {
+      const sortOrder = orderById.get(item.id);
+      return sortOrder ? { ...item, sort_order: sortOrder } : item;
+    }));
+    setOrderStatus('saving');
+    setNotice('');
+    try {
+      await reorderChecklistItems(nextItems.map((item, index) => ({ id: item.id, sortOrder: index + 1 })));
+      setOrderStatus('saved');
+    } catch {
+      setItems(previousItems);
+      setOrderStatus('error');
+    }
+  }
+
+  function moveItem(sourceId: string, targetId: string) {
+    if (!canReorder || sourceId === targetId) return;
+    const sourceIndex = activeItems.findIndex((item) => item.id === sourceId);
+    const targetIndex = activeItems.findIndex((item) => item.id === targetId);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+    const nextItems = [...activeItems];
+    const [moved] = nextItems.splice(sourceIndex, 1);
+    nextItems.splice(targetIndex, 0, moved);
+    void commitOrder(nextItems);
+  }
+
+  function moveItemByOffset(itemId: string, offset: -1 | 1) {
+    if (!canReorder) return;
+    const sourceIndex = activeItems.findIndex((item) => item.id === itemId);
+    const target = activeItems[sourceIndex + offset];
+    if (sourceIndex < 0 || !target) return;
+    moveItem(itemId, target.id);
+  }
+
+  function handleDragStart(event: DragEvent<HTMLButtonElement>, itemId: string) {
+    if (!canReorder) {
+      event.preventDefault();
+      return;
+    }
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', itemId);
+    setDraggedItemId(itemId);
+    setOrderStatus('idle');
+  }
+
+  function handleDrop(event: DragEvent<HTMLTableRowElement>, targetId: string) {
+    event.preventDefault();
+    const sourceId = draggedItemId || event.dataTransfer.getData('text/plain');
+    setDraggedItemId(null);
+    setDragOverItemId(null);
+    if (sourceId) moveItem(sourceId, targetId);
+  }
 
   function selectAdjacentTab<T extends string>(
     event: React.KeyboardEvent<HTMLButtonElement>,
@@ -129,18 +236,46 @@ export function ChecklistTab() {
       ?.focus();
   }
 
+  const orderMessage = search.trim()
+    ? t('reorderSearchHint')
+    : orderStatus === 'saving'
+      ? t('orderSaving')
+      : orderStatus === 'saved'
+        ? t('orderSaved')
+        : orderStatus === 'error'
+          ? t('reorderFailed')
+          : t('reorderHint');
+
   return (
-    <div className="panel panel--flush">
-      <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-        <h2 style={{ margin: 0, flex: 1 }}>{t('adminChecklist')}</h2>
-        <input placeholder={t('search')} value={search} onChange={(e) => setSearch(e.target.value)}
-          style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '7px 10px', fontSize: 13 }} />
-        <button type="button" className="btn btn--accent" style={{ padding: '8px 16px' }} onClick={() => openCreate()} disabled={loading}>
-          + {t('add')}
-        </button>
-      </div>
-      {loadError && <div className="alert alert--error" style={{ margin: '16px 20px 0' }}>{loadError}</div>}
-      {loading ? <p className="muted" style={{ padding: 20 }}>{t('loading')}</p> : (
+    <div className="panel panel--flush checklist-manager">
+      <header className="checklist-manager__toolbar">
+        <h2>{t('adminChecklist')}</h2>
+        <div className="checklist-manager__actions">
+          <label className="checklist-manager__search">
+            <SearchIcon />
+            <input
+              aria-label={t('searchChecklistItems')}
+              placeholder={t('searchChecklistItems')}
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setOrderStatus('idle');
+              }}
+            />
+          </label>
+          <button type="button" className="btn btn--secondary checklist-manager__button" onClick={() => setImportOpen(true)} disabled={loading}>
+            <UploadIcon /> {t('importFile')}
+          </button>
+          <button type="button" className="btn btn--accent checklist-manager__button" onClick={openCreate} disabled={loading}>
+            <span aria-hidden="true">+</span> {t('addItem')}
+          </button>
+        </div>
+      </header>
+
+      {loadError && <div className="alert alert--error checklist-manager__alert">{loadError}</div>}
+      {notice && <div className="checklist-manager__notice" role="status">✓ {notice}</div>}
+
+      {loading ? <p className="muted checklist-manager__loading">{t('loading')}</p> : (
         <div className="checklist-tab-layout">
           <div className="checklist-tab-section">
             <span className="checklist-group-kicker">{t('frequency')}</span>
@@ -158,8 +293,11 @@ export function ChecklistTab() {
                     tabIndex={isActive ? 0 : -1}
                     className={`checklist-tab${isActive ? ' checklist-tab--active' : ''}`}
                     key={frequency}
-                    onClick={() => setActiveFrequency(frequency)}
-                    onKeyDown={(event) => selectAdjacentTab(event, CHECKLIST_FREQUENCIES, activeFrequency, setActiveFrequency)}
+                    onClick={() => { setActiveFrequency(frequency); setOrderStatus('idle'); }}
+                    onKeyDown={(event) => selectAdjacentTab(event, CHECKLIST_FREQUENCIES, activeFrequency, (value) => {
+                      setActiveFrequency(value);
+                      setOrderStatus('idle');
+                    })}
                   >
                     <span>{freqLabel[frequency]}</span>
                     <span className="checklist-tab__count">{count}</span>
@@ -185,8 +323,11 @@ export function ChecklistTab() {
                     tabIndex={isActive ? 0 : -1}
                     className={`checklist-tab checklist-tab--secondary${isActive ? ' checklist-tab--active' : ''}`}
                     key={vehicleType}
-                    onClick={() => setActiveVehicleType(vehicleType)}
-                    onKeyDown={(event) => selectAdjacentTab(event, CHECKLIST_VEHICLE_TYPES, activeVehicleType, setActiveVehicleType)}
+                    onClick={() => { setActiveVehicleType(vehicleType); setOrderStatus('idle'); }}
+                    onKeyDown={(event) => selectAdjacentTab(event, CHECKLIST_VEHICLE_TYPES, activeVehicleType, (value) => {
+                      setActiveVehicleType(value);
+                      setOrderStatus('idle');
+                    })}
                   >
                     <span>{typeLabel[vehicleType]}</span>
                     <span className="checklist-tab__count">{count}</span>
@@ -202,22 +343,50 @@ export function ChecklistTab() {
             role="tabpanel"
             aria-labelledby={`checklist-frequency-${activeFrequency} checklist-vehicle-${activeVehicleType}`}
           >
-            <header className="checklist-tab-panel__header">
-              <h3>{freqLabel[activeFrequency]} · {typeLabel[activeVehicleType]}</h3>
-              <span className="checklist-count">{t('itemCount', { count: String(activeItems.length) })}</span>
-            </header>
             {activeItems.length === 0 ? <div className="table-empty">{t('noResults')}</div> : (
               <div className="table-scroll">
-                <table className="data-table checklist-group-table">
+                <table className="data-table checklist-manager-table">
                   <thead>
-                    <tr><th>#</th><th>{lang === 'th' ? t('nameTh') : t('nameEn')}</th><th>{t('sortOrder')}</th><th></th></tr>
+                    <tr><th>{t('order')}</th><th>{t('checklistItem')}</th><th>{t('actions')}</th></tr>
                   </thead>
                   <tbody>
                     {activeItems.map((item, index) => (
-                      <tr key={item.id}>
-                        <td className="muted">{index + 1}</td>
-                        <td className="checklist-item-name">{lang === 'th' ? item.item_name_th : item.item_name_en}</td>
-                        <td className="muted">{item.sort_order}</td>
+                      <tr
+                        className={`${draggedItemId === item.id ? 'checklist-manager-row--dragging ' : ''}${dragOverItemId === item.id ? 'checklist-manager-row--drop-target' : ''}`.trim()}
+                        key={item.id}
+                        onDragOver={(event) => {
+                          if (!draggedItemId || draggedItemId === item.id) return;
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = 'move';
+                          setDragOverItemId(item.id);
+                        }}
+                        onDrop={(event) => handleDrop(event, item.id)}
+                      >
+                        <td className="checklist-manager-table__order">
+                          <button
+                            type="button"
+                            className="checklist-drag-handle"
+                            aria-label={`${t('dragToReorder')}: ${lang === 'th' ? item.item_name_th : item.item_name_en}`}
+                            title={canReorder ? t('dragToReorder') : t('reorderSearchHint')}
+                            draggable={canReorder}
+                            disabled={!canReorder}
+                            onDragStart={(event) => handleDragStart(event, item.id)}
+                            onDragEnd={() => { setDraggedItemId(null); setDragOverItemId(null); }}
+                            onKeyDown={(event) => {
+                              if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+                                event.preventDefault();
+                                moveItemByOffset(item.id, event.key === 'ArrowUp' ? -1 : 1);
+                              }
+                            }}
+                          >
+                            <DragHandleIcon />
+                          </button>
+                          <span>{index + 1}</span>
+                        </td>
+                        <td className="checklist-item-name">
+                          <strong>{lang === 'th' ? item.item_name_th : item.item_name_en}</strong>
+                          <span>{lang === 'th' ? item.item_name_en : item.item_name_th}</span>
+                        </td>
                         <td className="checklist-row-actions">
                           <button type="button" className="btn btn--secondary btn--sm" onClick={() => openEdit(item)}>{t('editAction')}</button>
                           <button type="button" className="btn btn--sm checklist-delete-button" onClick={() => handleDelete(item)}>{t('deleteAction')}</button>
@@ -229,44 +398,60 @@ export function ChecklistTab() {
               </div>
             )}
           </section>
+          <div className={`checklist-manager__status checklist-manager__status--${orderStatus}`} aria-live="polite">
+            <span aria-hidden="true">{orderStatus === 'error' ? '!' : '✓'}</span> {orderMessage}
+          </div>
         </div>
       )}
+
+      <ChecklistImportDialog
+        open={importOpen}
+        defaults={{ frequency: activeFrequency, vehicleType: activeVehicleType }}
+        existingItems={items}
+        frequencyLabel={(frequency) => freqLabel[frequency]}
+        vehicleTypeLabel={(vehicleType) => typeLabel[vehicleType]}
+        onClose={() => setImportOpen(false)}
+        onImported={async (count, firstRow) => {
+          setImportOpen(false);
+          setActiveFrequency(firstRow.frequency);
+          setActiveVehicleType(firstRow.vehicleType);
+          await load();
+          setNotice(t('importSuccess', { count: String(count) }));
+        }}
+      />
+
       {modal !== null && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'grid', placeItems: 'center', zIndex: 100 }}>
-          <div style={{ background: 'var(--panel)', borderRadius: 16, padding: 28, width: 'min(460px, 95vw)', display: 'grid', gap: 14 }}>
-            <h3 style={{ margin: 0 }}>{modal === 'create' ? `+ ${t('adminChecklist')}` : t('editAction')}</h3>
+        <div className="checklist-modal-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget && !saving) setModal(null);
+        }}>
+          <section className="checklist-item-dialog" role="dialog" aria-modal="true" aria-labelledby="checklist-item-dialog-title">
+            <h3 id="checklist-item-dialog-title">{modal === 'create' ? t('addItem') : t('editAction')}</h3>
             {error && <div className="alert alert--error">{error}</div>}
             {([['itemNameTh', 'nameTh'], ['itemNameEn', 'nameEn']] as [keyof Form, 'nameTh' | 'nameEn'][]).map(([field, key]) => (
-              <label key={field} style={{ display: 'grid', gap: 4, fontSize: 13, fontWeight: 600 }}>
-                {t(key)}
-                <input value={form[field]} onChange={(e) => setForm((f) => ({ ...f, [field]: e.target.value }))}
-                  style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', fontSize: 14 }} />
+              <label className="checklist-form-field" key={field}>
+                <span>{t(key)}</span>
+                <input value={form[field]} onChange={(event) => setForm((current) => ({ ...current, [field]: event.target.value }))} />
               </label>
             ))}
-            <label style={{ display: 'grid', gap: 4, fontSize: 13, fontWeight: 600 }}>
-              {t('frequency')}
-              <select value={form.frequency} onChange={(e) => setForm((f) => ({ ...f, frequency: e.target.value as ChecklistFrequency }))}
-                style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', fontSize: 14 }}>
-                {CHECKLIST_FREQUENCIES.map((frequency) => <option key={frequency} value={frequency}>{freqLabel[frequency]}</option>)}
-              </select>
-            </label>
-            <label style={{ display: 'grid', gap: 4, fontSize: 13, fontWeight: 600 }}>
-              {t('vehicleType')}
-              <select value={form.vehicleType} onChange={(e) => setForm((f) => ({ ...f, vehicleType: e.target.value as VehicleType }))}
-                style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', fontSize: 14 }}>
-                {CHECKLIST_VEHICLE_TYPES.map((vehicleType) => <option key={vehicleType} value={vehicleType}>{typeLabel[vehicleType]}</option>)}
-              </select>
-            </label>
-            <label style={{ display: 'grid', gap: 4, fontSize: 13, fontWeight: 600 }}>
-              {t('sortOrder')}
-              <input type="number" value={form.sortOrder} onChange={(e) => setForm((f) => ({ ...f, sortOrder: e.target.value }))}
-                style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', fontSize: 14 }} />
-            </label>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-              <button type="button" className="btn btn--secondary" onClick={() => setModal(null)}>{t('cancel')}</button>
-              <button type="button" className="btn btn--accent" onClick={handleSave} disabled={saving}>{saving ? t('saving') : t('save')}</button>
+            <div className="checklist-item-dialog__grid">
+              <label className="checklist-form-field">
+                <span>{t('frequency')}</span>
+                <select value={form.frequency} onChange={(event) => setForm((current) => ({ ...current, frequency: event.target.value as ChecklistFrequency }))}>
+                  {CHECKLIST_FREQUENCIES.map((frequency) => <option key={frequency} value={frequency}>{freqLabel[frequency]}</option>)}
+                </select>
+              </label>
+              <label className="checklist-form-field">
+                <span>{t('vehicleType')}</span>
+                <select value={form.vehicleType} onChange={(event) => setForm((current) => ({ ...current, vehicleType: event.target.value as VehicleType }))}>
+                  {CHECKLIST_VEHICLE_TYPES.map((vehicleType) => <option key={vehicleType} value={vehicleType}>{typeLabel[vehicleType]}</option>)}
+                </select>
+              </label>
             </div>
-          </div>
+            <footer>
+              <button type="button" className="btn btn--secondary" onClick={() => setModal(null)}>{t('cancel')}</button>
+              <button type="button" className="btn btn--accent" onClick={() => void handleSave()} disabled={saving || !form.itemNameTh.trim() || !form.itemNameEn.trim()}>{saving ? t('saving') : t('save')}</button>
+            </footer>
+          </section>
         </div>
       )}
     </div>
