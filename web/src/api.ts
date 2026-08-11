@@ -492,7 +492,7 @@ export function updateChecklistItem(data: { id: string; itemNameTh?: string; ite
 }
 
 export function deleteChecklistItem(id: string) {
-  return apiFetch<{ deleted: boolean }>(`/api/admin/checklist?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+  return apiFetch<{ deleted: boolean; retired?: boolean }>(`/api/admin/checklist?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
 export function fetchAdminAnalytics(days: 7 | 30 | 90) {
