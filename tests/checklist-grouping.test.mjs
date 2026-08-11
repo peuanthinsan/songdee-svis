@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { groupChecklistItems } from '../web/src/checklist-groups.ts';
 
 const mobileChecklist = readFileSync('app/(app)/admin/checklist.tsx', 'utf8');
+const webChecklist = readFileSync('web/src/pages/admin/ChecklistTab.tsx', 'utf8');
 
 const items = [
   { id: '5', frequency: 'weekly', vehicle_type: 'van', sort_order: 1, item_name_th: 'จ', item_name_en: 'Echo' },
@@ -50,5 +51,16 @@ test('mobile checklist presents frequency before vehicle type', () => {
   assert.ok(
     mobileChecklist.indexOf('{/* Frequency picker */}')
       < mobileChecklist.indexOf('{/* Vehicle Type picker */}'),
+  );
+});
+
+test('web checklist uses accessible frequency and vehicle type tabs', () => {
+  assert.equal((webChecklist.match(/role="tablist"/g) ?? []).length, 2);
+  assert.ok(webChecklist.includes('aria-selected={isActive}'));
+  assert.ok(webChecklist.includes('role="tabpanel"'));
+  assert.ok(webChecklist.includes('selectAdjacentTab'));
+  assert.ok(
+    webChecklist.indexOf('CHECKLIST_FREQUENCIES.map')
+      < webChecklist.indexOf('CHECKLIST_VEHICLE_TYPES.map'),
   );
 });
