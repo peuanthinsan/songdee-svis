@@ -1,0 +1,10 @@
+task_id: example-task
+active_root: codex-or-claude
+delegated_provider: codex-or-claude
+phase: scope_frozen
+requested_lane: plan-or-implement-or-review
+observed_model: UNKNOWN
+observed_effort: UNKNOWN
+base_ref: replace-with-sha
+writer_lease: active_root
+status: pending

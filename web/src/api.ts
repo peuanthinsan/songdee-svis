@@ -22,7 +22,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   const token = getToken();
   const headers = new Headers(init.headers);
   if (token) headers.set('Authorization', `Bearer ${token}`);
-  if (init.body && !headers.has('Content-Type')) {
+  if (init.body && !headers.has('Content-Type') && !(init.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
 
@@ -417,6 +417,26 @@ export function updateAdminUser(id: string, data: { password?: string; firstName
 
 export function deleteAdminUser(id: string) {
   return apiFetch<{ deleted: boolean }>(`/api/admin/users/${id}`, { method: 'DELETE' });
+}
+
+export type UserImportMode = 'add' | 'modify' | 'replace';
+export type UserImportSummary = {
+  mode: UserImportMode;
+  sourceRows: number;
+  skippedStruck: number;
+  add: number;
+  modify: number;
+  deactivate: number;
+  errors: string[];
+};
+
+export function importAdminUsers(file: File, mode: UserImportMode, apply = false) {
+  const body = new FormData();
+  body.append('file', file);
+  return apiFetch<{ summary: UserImportSummary; imported?: boolean }>(`/api/admin/users/import?mode=${mode}`, {
+    method: apply ? 'PUT' : 'POST',
+    body,
+  });
 }
 
 export function fetchAdminVehicles(params?: { limit?: number; offset?: number; search?: string; fleetId?: string }) {
