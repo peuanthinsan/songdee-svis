@@ -18,6 +18,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       SELECT id, vehicle_type, frequency, item_name_th, item_name_en, sort_order, section
       FROM checklist_items
       WHERE company_id = ${user.companyId}
+        AND is_active
         AND vehicle_type = ${vehicleType as string}
         AND frequency = ${frequency as string}
       ORDER BY sort_order
