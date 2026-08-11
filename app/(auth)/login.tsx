@@ -44,6 +44,7 @@ export default function LoginScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+  const [manualUsername, setManualUsername] = useState(false);
   const [showCompanyPicker, setShowCompanyPicker] = useState(false);
   const [search, setSearch] = useState('');
   const [driverNames, setDriverNames] = useState<string[]>([]);
@@ -65,11 +66,17 @@ export default function LoginScreen() {
   }, []);
 
   useEffect(() => {
-    setSelectedName(''); setSelectedStaffName(''); setUsername(''); setSearch('');
+    setSelectedName(''); setSelectedStaffName(''); setUsername(''); setSearch(''); setManualUsername(false);
     fetch(`${API_BASE}/api/auth/users-list?company=${encodeURIComponent(selectedCompanySlug)}`)
       .then((r) => r.json())
-      .then((data) => { setDriverNames(data.drivers || []); setStaffNames(data.staff || []); })
-      .catch(() => { setDriverNames([]); setStaffNames([]); });
+      .then((data) => {
+        const nextDrivers = data.drivers || [];
+        const nextStaff = data.staff || [];
+        setDriverNames(nextDrivers);
+        setStaffNames(nextStaff);
+        if (!nextDrivers.length && !nextStaff.length) setManualUsername(true);
+      })
+      .catch(() => { setDriverNames([]); setStaffNames([]); setManualUsername(true); });
   }, [selectedCompanySlug]);
 
   const nameList = mode === 'driver' ? driverNames : staffNames;
@@ -138,20 +145,39 @@ export default function LoginScreen() {
 
           <View style={styles.form}>
             <View style={styles.modeToggle}>
-              <TouchableOpacity style={[styles.modeBtn, mode === 'driver' && styles.modeBtnActive]} onPress={() => { setMode('driver'); setError(''); }}>
+              <TouchableOpacity style={[styles.modeBtn, mode === 'driver' && styles.modeBtnActive]} onPress={() => { setMode('driver'); setManualUsername(false); setUsername(''); setError(''); }}>
                 <Text style={[styles.modeBtnText, mode === 'driver' && styles.modeBtnTextActive]}>{t('login.driverMode')}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.modeBtn, mode === 'staff' && styles.modeBtnActive]} onPress={() => { setMode('staff'); setError(''); }}>
+              <TouchableOpacity style={[styles.modeBtn, mode === 'staff' && styles.modeBtnActive]} onPress={() => { setMode('staff'); setManualUsername(false); setUsername(''); setError(''); }}>
                 <Text style={[styles.modeBtnText, mode === 'staff' && styles.modeBtnTextActive]}>{t('login.staffMode')}</Text>
               </TouchableOpacity>
             </View>
             <View style={styles.inputWrapper}>
               <Ionicons name="person-outline" size={20} color={colors.textTertiary} style={styles.inputIcon} />
-              <TouchableOpacity style={styles.pickerInner} onPress={() => setShowPicker(true)}>
-                <Text style={[styles.pickerText, !currentName && styles.pickerPlaceholder]}>{currentName || (mode === 'driver' ? t('login.selectDriver') : t('login.selectStaff'))}</Text>
-                <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
-              </TouchableOpacity>
+              {manualUsername ? (
+                <TextInput
+                  style={styles.input}
+                  placeholder={t('login.username')}
+                  placeholderTextColor={colors.textTertiary}
+                  value={username}
+                  onChangeText={setUsername}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  textContentType="username"
+                />
+              ) : (
+                <TouchableOpacity style={styles.pickerInner} onPress={() => setShowPicker(true)}>
+                  <Text style={[styles.pickerText, !currentName && styles.pickerPlaceholder]}>{currentName || (mode === 'driver' ? t('login.selectDriver') : t('login.selectStaff'))}</Text>
+                  <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
+              )}
             </View>
+            <TouchableOpacity
+              onPress={() => { setManualUsername(!manualUsername); setUsername(''); setSelectedName(''); setSelectedStaffName(''); }}
+              disabled={!manualUsername && nameList.length === 0}
+            >
+              <Text style={styles.manualToggleText}>{manualUsername ? t('login.useUserPicker') : t('login.enterUsernameManually')}</Text>
+            </TouchableOpacity>
 
             <View style={styles.inputWrapper}>
               <Ionicons name="lock-closed-outline" size={20} color={colors.textTertiary} style={styles.inputIcon} />
@@ -219,13 +245,13 @@ export default function LoginScreen() {
               keyboardShouldPersistTaps="handled"
               ListEmptyComponent={<Text style={styles.emptyUserText}>{t('login.searchDriver')}</Text>}
               renderItem={({ item }) => (
-                <TouchableOpacity style={styles.userOption} onPress={() => { if (mode === 'driver') setSelectedName(item); else setSelectedStaffName(item); setUsername(''); setShowPicker(false); setSearch(''); }}>
+                <TouchableOpacity style={styles.userOption} onPress={() => { if (mode === 'driver') setSelectedName(item); else setSelectedStaffName(item); setManualUsername(false); setUsername(''); setShowPicker(false); setSearch(''); }}>
                   <Text style={styles.userOptionText}>{item}</Text>
                 </TouchableOpacity>
               )}
             />
-            <TouchableOpacity style={styles.manualUserButton} onPress={() => { setUsername(''); setShowPicker(false); }}>
-              <Text style={styles.manualUserText}>{t('login.username')}</Text>
+            <TouchableOpacity style={styles.manualUserButton} onPress={() => { setManualUsername(true); setSelectedName(''); setSelectedStaffName(''); setUsername(''); setShowPicker(false); }}>
+              <Text style={styles.manualUserText}>{t('login.enterUsernameManually')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -450,6 +476,7 @@ const styles = StyleSheet.create({
   emptyUserText: { color: colors.textTertiary, padding: spacing.lg, textAlign: 'center' },
   manualUserButton: { borderTopWidth: 1, borderTopColor: colors.border, padding: spacing.md },
   manualUserText: { color: colors.accent, fontWeight: '700', textAlign: 'center' },
+  manualToggleText: { color: colors.accent, fontSize: 13, fontWeight: '700', paddingVertical: 4, textAlign: 'center' },
   companyOption: {
     alignItems: 'center',
     borderBottomColor: colors.border,
