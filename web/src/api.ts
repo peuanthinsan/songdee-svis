@@ -487,6 +487,26 @@ export function createChecklistItem(data: { itemNameTh: string; itemNameEn: stri
   return apiFetch<ChecklistItem>('/api/admin/checklist', { method: 'POST', body: JSON.stringify(data) });
 }
 
+export function importChecklistItems(items: Array<{
+  itemNameTh: string;
+  itemNameEn: string;
+  vehicleType: string;
+  frequency: string;
+  sortOrder: number;
+}>) {
+  return apiFetch<{ imported: number; items: ChecklistItem[] }>('/api/admin/checklist', {
+    method: 'POST',
+    body: JSON.stringify({ items }),
+  });
+}
+
+export function reorderChecklistItems(items: Array<{ id: string; sortOrder: number }>) {
+  return apiFetch<{ updated: number; items: Array<{ id: string; sort_order: number }> }>('/api/admin/checklist', {
+    method: 'PATCH',
+    body: JSON.stringify({ items }),
+  });
+}
+
 export function updateChecklistItem(data: { id: string; itemNameTh?: string; itemNameEn?: string; vehicleType?: string; frequency?: string; sortOrder?: number }) {
   return apiFetch<ChecklistItem>('/api/admin/checklist', { method: 'PUT', body: JSON.stringify(data) });
 }

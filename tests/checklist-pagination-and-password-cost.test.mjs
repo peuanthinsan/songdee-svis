@@ -2,6 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
+import {
+  ChecklistInputError,
+  normalizeChecklistImport,
+  normalizeChecklistOrder,
+} from '../lib/checklist-admin.ts';
 
 const mobileChecklist = readFileSync('app/(app)/admin/checklist.tsx', 'utf8');
 const webChecklist = readFileSync('web/src/pages/admin/ChecklistTab.tsx', 'utf8');
@@ -26,6 +31,9 @@ function loadChecklistHandler(sqlCalls, rows) {
     if (specifier === '@neondatabase/serverless') return { neon: () => sql };
     if (specifier === '../../lib/admin-auth') {
       return { requireAdmin: async () => ({ companyId: 'company-1' }) };
+    }
+    if (specifier === '../../lib/checklist-admin') {
+      return { ChecklistInputError, normalizeChecklistImport, normalizeChecklistOrder };
     }
     throw new Error(`Unexpected import in test: ${specifier}`);
   };
