@@ -38,8 +38,9 @@ test('the login roster returns active users by company', () => {
 
 test('mobile and web login request and use the roster', () => {
   assert.match(mobileLoginSource, /\/api\/auth\/users-list/);
-  assert.match(mobileLoginSource, /setDriverNames/);
-  assert.match(mobileLoginSource, /setStaffNames/);
+  assert.match(mobileLoginSource, /setDriverAccounts/);
+  assert.match(mobileLoginSource, /setStaffAccounts/);
+  assert.match(mobileLoginSource, /currentAccount/);
   assert.match(mobileLoginSource, /signIn\(identifier, password, selectedCompanySlug\)/);
 
   assert.match(webLoginSource, /fetchLoginUsers|LoginAccount/);
