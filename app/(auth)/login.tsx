@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
+  FlatList,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { colors, spacing, borderRadius, shadows } from '../../constants/theme';
@@ -26,14 +27,27 @@ const DEFAULT_COMPANIES: Company[] = [{
   accentColor: '#D40511',
 }];
 
+function nameToUsername(name: string): string {
+  return name.toLowerCase().replace(/\s+/g, '_');
+}
+
+type LoginMode = 'driver' | 'staff';
+
 export default function LoginScreen() {
   const { signIn } = useAuth();
   const { t } = useI18n();
+  const [mode, setMode] = useState<LoginMode>('driver');
+  const [selectedName, setSelectedName] = useState('');
+  const [selectedStaffName, setSelectedStaffName] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
   const [showCompanyPicker, setShowCompanyPicker] = useState(false);
+  const [search, setSearch] = useState('');
+  const [driverNames, setDriverNames] = useState<string[]>([]);
+  const [staffNames, setStaffNames] = useState<string[]>([]);
   const [showPassword, setShowPassword] = useState(false);
   const [companies, setCompanies] = useState<Company[]>(DEFAULT_COMPANIES);
   const [selectedCompanySlug, setSelectedCompanySlug] = useState('dhl');
@@ -50,14 +64,27 @@ export default function LoginScreen() {
       .catch(() => {});
   }, []);
 
-  const canSubmit = !loading && password.length > 0 && username.trim().length > 0;
+  useEffect(() => {
+    setSelectedName(''); setSelectedStaffName(''); setUsername(''); setSearch('');
+    fetch(`${API_BASE}/api/auth/users-list?company=${encodeURIComponent(selectedCompanySlug)}`)
+      .then((r) => r.json())
+      .then((data) => { setDriverNames(data.drivers || []); setStaffNames(data.staff || []); })
+      .catch(() => { setDriverNames([]); setStaffNames([]); });
+  }, [selectedCompanySlug]);
+
+  const nameList = mode === 'driver' ? driverNames : staffNames;
+  const currentName = mode === 'driver' ? selectedName : selectedStaffName;
+  const filteredNames = nameList.filter((name) => name.toLowerCase().includes(search.toLowerCase()));
+  const identifier = currentName ? nameToUsername(currentName) : username.trim();
+
+  const canSubmit = !loading && password.length > 0 && identifier.length > 0;
 
   async function handleSignIn() {
     if (!canSubmit) return;
     setLoading(true);
     setError('');
     try {
-      await signIn(username.trim(), password, selectedCompanySlug);
+      await signIn(identifier, password, selectedCompanySlug);
       // Auth context handles navigation via AuthGate
     } catch (err: any) {
       const msg = err.message || '';
@@ -110,18 +137,20 @@ export default function LoginScreen() {
           </TouchableOpacity>
 
           <View style={styles.form}>
+            <View style={styles.modeToggle}>
+              <TouchableOpacity style={[styles.modeBtn, mode === 'driver' && styles.modeBtnActive]} onPress={() => { setMode('driver'); setError(''); }}>
+                <Text style={[styles.modeBtnText, mode === 'driver' && styles.modeBtnTextActive]}>{t('login.driverMode')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modeBtn, mode === 'staff' && styles.modeBtnActive]} onPress={() => { setMode('staff'); setError(''); }}>
+                <Text style={[styles.modeBtnText, mode === 'staff' && styles.modeBtnTextActive]}>{t('login.staffMode')}</Text>
+              </TouchableOpacity>
+            </View>
             <View style={styles.inputWrapper}>
               <Ionicons name="person-outline" size={20} color={colors.textTertiary} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder={t('login.username')}
-                placeholderTextColor={colors.textTertiary}
-                value={username}
-                onChangeText={setUsername}
-                autoCapitalize="none"
-                autoCorrect={false}
-                textContentType="username"
-              />
+              <TouchableOpacity style={styles.pickerInner} onPress={() => setShowPicker(true)}>
+                <Text style={[styles.pickerText, !currentName && styles.pickerPlaceholder]}>{currentName || (mode === 'driver' ? t('login.selectDriver') : t('login.selectStaff'))}</Text>
+                <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
             </View>
 
             <View style={styles.inputWrapper}>
@@ -175,6 +204,32 @@ export default function LoginScreen() {
           />
         </View>
       </View>
+
+      <Modal visible={showPicker} animationType="fade" transparent statusBarTranslucent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.userModal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{mode === 'driver' ? t('login.selectDriver') : t('login.selectStaff')}</Text>
+              <TouchableOpacity onPress={() => setShowPicker(false)} style={styles.modalCloseBtn}><Ionicons name="close" size={24} color={colors.textSecondary} /></TouchableOpacity>
+            </View>
+            <TextInput style={styles.searchInput} placeholder={t('login.searchDriver')} value={search} onChangeText={setSearch} />
+            <FlatList
+              data={filteredNames}
+              keyExtractor={(item) => item}
+              keyboardShouldPersistTaps="handled"
+              ListEmptyComponent={<Text style={styles.emptyUserText}>{t('login.searchDriver')}</Text>}
+              renderItem={({ item }) => (
+                <TouchableOpacity style={styles.userOption} onPress={() => { if (mode === 'driver') setSelectedName(item); else setSelectedStaffName(item); setUsername(''); setShowPicker(false); setSearch(''); }}>
+                  <Text style={styles.userOptionText}>{item}</Text>
+                </TouchableOpacity>
+              )}
+            />
+            <TouchableOpacity style={styles.manualUserButton} onPress={() => { setUsername(''); setShowPicker(false); }}>
+              <Text style={styles.manualUserText}>{t('login.username')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={showCompanyPicker} animationType="fade" transparent statusBarTranslucent>
         <View style={styles.modalOverlay}>
@@ -302,6 +357,21 @@ const styles = StyleSheet.create({
   form: {
     gap: 10,
   },
+  modeToggle: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  modeBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 9,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  modeBtnActive: { borderBottomColor: colors.accent },
+  modeBtnText: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
+  modeBtnTextActive: { color: colors.accent },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -325,6 +395,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
+  pickerInner: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
+  pickerText: { flex: 1, color: colors.textPrimary, fontSize: 15 },
+  pickerPlaceholder: { color: colors.textTertiary },
   error: {
     color: colors.statusFail,
     fontSize: 14,
@@ -356,6 +429,27 @@ const styles = StyleSheet.create({
     margin: spacing.lg,
     overflow: 'hidden',
   },
+  userModal: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    margin: spacing.lg,
+    maxHeight: '80%',
+    overflow: 'hidden',
+  },
+  searchInput: {
+    margin: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.sm,
+    color: colors.textPrimary,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  userOption: { borderBottomWidth: 1, borderBottomColor: colors.border, padding: spacing.md },
+  userOptionText: { color: colors.textPrimary, fontSize: 15 },
+  emptyUserText: { color: colors.textTertiary, padding: spacing.lg, textAlign: 'center' },
+  manualUserButton: { borderTopWidth: 1, borderTopColor: colors.border, padding: spacing.md },
+  manualUserText: { color: colors.accent, fontWeight: '700', textAlign: 'center' },
   companyOption: {
     alignItems: 'center',
     borderBottomColor: colors.border,
