@@ -64,21 +64,6 @@ export function fetchCompanies() {
   return apiFetch<{ defaultCompanySlug: string; companies: Company[] }>('/api/companies');
 }
 
-export type LoginAccount = {
-  username: string;
-  displayName: string;
-  role: 'driver' | 'supervisor' | 'admin';
-};
-
-export function fetchLoginUsers(companySlug: string) {
-  return apiFetch<{
-    drivers: string[];
-    staff: string[];
-    driverAccounts: LoginAccount[];
-    staffAccounts: LoginAccount[];
-  }>(`/api/auth/users-list?company=${encodeURIComponent(companySlug)}`);
-}
-
 export type FleetStat = {
   fleetId: string;
   total: number;
@@ -492,11 +477,10 @@ export function updateAdminFleet(fleetId: string, fleetManagerEmail: string) {
 }
 
 export function fetchAdminChecklist(params?: { vehicleType?: string; frequency?: string }) {
-  const qs = new URLSearchParams();
+  const qs = new URLSearchParams({ all: '1' });
   if (params?.vehicleType) qs.set('vehicleType', params.vehicleType);
   if (params?.frequency) qs.set('frequency', params.frequency);
-  const q = qs.toString();
-  return apiFetch<ChecklistItem[]>(`/api/admin/checklist${q ? `?${q}` : ''}`);
+  return apiFetch<ChecklistItem[]>(`/api/admin/checklist?${qs}`);
 }
 
 export function createChecklistItem(data: { itemNameTh: string; itemNameEn: string; vehicleType: string; frequency: string; sortOrder?: number }) {

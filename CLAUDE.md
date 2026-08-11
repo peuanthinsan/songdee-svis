@@ -52,24 +52,95 @@ database**, not "migration pending". New write scripts must call `requireConfirm
 
 ## Workflow & governance
 
-- **Commands:** gate = `npm run typecheck` at the root + `npm run build:dashboard`.
-  There are NO test or lint scripts — the compiler is the whole net; report changes as
-  "builds and typechecks; untested by design" and read the full diff before pushing.
-  GitHub Actions runs both gates on every pull request and push to `main`; rely on CI
-  for the broad gate unless diagnosing a CI failure.
+- **Commands:** gate = `npm run typecheck` + `npm test` at the root + `npm run build:dashboard`.
+  There is NO lint script. `npm test` runs `node --test` over `tests/*.test.mjs` — a glob, so
+  a new `tests/*.test.mjs` file is picked up automatically. Read the full diff before pushing.
+  GitHub Actions runs all three gates on every pull request and push to `main`; rely on CI for
+  the broad gate unless diagnosing a CI failure.
+  **Know what the gate does NOT cover.** `tsconfig.json`'s `include` lists only `**/*.ts` and
+  `**/*.tsx`, so no `.js` file is ever matched and `tsc --noEmit` never reads one — nothing in
+  `scripts/` is compiled by anything, and `build:dashboard` only builds `web/`. (Note it is the
+  `include` globs that do this, NOT `allowJs`: the repo extends `expo/tsconfig.base`, which sets
+  `allowJs: true`. `allowJs` only *permits* a `.js` file to compile once matched; it never adds
+  one. Verify with `npx tsc --noEmit --listFiles | grep /scripts/` — zero hits.) A change
+  confined to `scripts/` passes typecheck and build whether it works or not. Prove that code
+  by running it and asserting on the observable behaviour; do not report "typechecks" as
+  if it were coverage.
+  Two parts of `scripts/` do have real coverage. `tests/company-target.test.mjs` unit-tests
+  `scripts/lib/company-target.js` (tenant selection). And `tests/db-target-guard.test.mjs`
+  covers the `.env.local`/wrong-database guard: it spawns every script that calls
+  `requireConfirmedTarget()` against a fake host and asserts each one refuses before
+  connecting. Its classification matrix is derived from disk by a recursive scan, so **adding a
+  new guard-calling script anywhere under `scripts/` fails that suite until you classify it**
+  by whether it connects during `--dry-run`. That suite is a complete net for scripts that
+  return before connecting, and only a partial one for the three that legitimately read during
+  `--dry-run` (`seed-db.js`, `seed-users-postgres.js`, `wipe-history.js`) — see its header
+  comment for the exact limits. Every other `.js` file under `scripts/` has no automated
+  coverage at all.
 - **Tenancy:** every new domain query must be scoped by the JWT `companyId`. Admin means
   company admin, not cross-company platform admin.
 - **i18n:** UI strings exist in TWO files with non-corresponding keys
   (`web/src/i18n.ts` AND `lib/i18n.ts`) — change both, Thai and English.
-- **Git:** this checkout carries deliberate uncommitted WIP (vercel.json, package.json,
-  seed scripts) — NEVER `git add -A`; commit only your task's files by explicit
-  pathspec. Parallel sessions are real: check `git status` + `git log -1` immediately
-  before committing.
-- **Deploy:** a push to `main` starts a Vercel web production deploy after
-  GitHub Actions gates pass. A newer push cancels the superseded workflow, leaving
-  the newest green `main` SHA as the deployment candidate. Pull requests never deploy. Keep
-  `git.deploymentEnabled:false` in `vercel.json` to prevent a duplicate Vercel
-  Git deployment. Mobile (Expo/EAS) releases remain the user's call only.
+- **Git:** this checkout may carry deliberate uncommitted WIP, and which files are dirty
+  changes over time — do not trust a list written here. NEVER `git add -A`; commit only
+  your task's files by explicit pathspec. Parallel sessions are real: check `git status`
+  + `git log -1` immediately before committing.
+- **Deploy:** a push to `main` IS a production release — automatic, no human step, no
+  manual command. Never end a response with a `vercel deploy --prod` block for this repo;
+  the pipeline already deployed, and a manual run would only add a redundant second
+  deployment. Vercel's Git integration is the authoritative production deploy path;
+  `git.deploymentEnabled: true` in `vercel.json` is intentional. A push to `main` creates a
+  production deployment within about 5 seconds, but creation is not live — it serves
+  production only once the build finishes (~30s+). GitHub Actions runs gates only
+  (typecheck, unit tests, dashboard build) and does NOT deploy; do not re-add a deploy job
+  there, since two armed paths produce two racing production deployments of the same
+  commit and whichever finishes last wins. This was the real state from commit `8a01fd5`
+  until 2026-08-05 (verified: SHA `032ee6a` went out as `git` at 10:00:32 and again as
+  `cli` at 10:15:53). **What gates production (2026-08-05):** Vercel does NOT wait for
+  Actions — it starts building seconds after the commit lands, while gates take ~40s. So
+  the gate is on what ENTERS `main`, not on the deploy: branch protection on `main`
+  requires the `gates` check, with `strict: true` (the branch must be up to date with
+  `main`, so the tree that passed gates is the tree that lands) and `enforce_admins: true`
+  (no bypass, including for the repo owner). State the guarantee precisely, because it is
+  narrower than "everything goes through a PR" AND narrower than "every landed SHA was
+  checked": **what is guaranteed is the tree, not the SHA — the content that lands on
+  `main` is content that passed `gates`.** GitHub evaluates required checks against the PR
+  *head* SHA; the merge button then creates a brand-new merge commit that carries no checks
+  of its own, and `gates` runs on that merge SHA only afterwards, as a report. `strict:
+  true` is what makes this sound: with the branch up to date, the merge commit's tree is
+  identical to the tested head's tree (verified 2026-08-05 — `merge^{tree}` ==
+  `merge^2^{tree}` on `cd13c69`, `3c56533`, and `c03d855`). Do NOT restate this as a
+  per-SHA guarantee; that is false for every merge-button landing, which is how all of
+  PR #8–#14 landed. `required_pull_request_reviews` is deliberately `null` — a solo
+  maintainer cannot self-approve, so requiring review would deadlock `main`. Consequence: a
+  fresh local commit is rejected outright (no check exists for its SHA), while the green
+  head of an open PR *can* be fast-forwarded straight to `main` without the merge button,
+  because that SHA already carries the check. The remaining limit: this gates entry to
+  `main` only, and
+  anything that reaches `main` deploys immediately regardless. Weakening `strict` or
+  `enforce_admins`, or an admin editing or deleting the protection rule itself, re-opens
+  the ungated path to production. **History warning:** on 2026-08-05 commit `18bee72` set
+  `git.deploymentEnabled` to `{"main": false}` to disarm the duplicate, but the Actions
+  deploy job it left as the sole path was already broken. Most consistent explanation —
+  inferred, not proven: the `VERCEL_TOKEN` secret lost team access about four days after
+  being minted, giving "You do not have access to the specified account" where the earlier
+  failure had said "token ... is not valid". What was actually tested: both
+  `team_1ZYOKeXRL8nUJkgFD8pCksSt` and `uthens-projects` resolve fine as `--scope` values
+  against a valid credential. What was NOT tested: the secret itself (GitHub secrets cannot
+  be read back), and the CLI version that actually failed — the scope test ran on 58.0.0
+  while the failing job installed 58.5.1 via unpinned `vercel@latest`, so a CLI regression
+  is not fully excluded, and if it were one then the unpinned install is itself the bug.
+  That broken sole path killed production deploys outright and stranded `main` two commits
+  ahead of production. Do not assume a non-expiring token makes an Actions-owned path safe — access
+  can be lost without expiry; verify any such path actually deploys before relying on it,
+  and do not disable the Git path again unless an alternative has been verified working
+  first. Vercel promotes by
+  build-completion order, not commit order: if two merges land seconds apart and the older
+  commit's build finishes last, production serves the OLDER commit; branch protection does
+  not fix this, so after rapid back-to-back merges, verify the deployed SHA and redeploy if
+  production is serving the older one. Branch pushes and pull requests do get Vercel
+  preview deployments (the integration stays connected for non-`main` branches), but never
+  production. Mobile (Expo/EAS) releases remain the user's call only.
 - **Models:** plan on Fable/Opus; code with Codex by default (codex-delegation skill — Codex prompts must forbid git); review/verify/git on Fable/Opus.
 
 ## Codex Delegation
