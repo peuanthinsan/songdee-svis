@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AdminUser, fetchAdminUsers, createAdminUser, updateAdminUser, deleteAdminUser } from '../../api';
+import { AdminUser, fetchAdminUsers, createAdminUser, updateAdminUser, deleteAdminUser, importAdminUsers, UserImportMode, UserImportSummary } from '../../api';
 import { t } from '../../i18n';
 import { useDebounce } from '../../useDebounce';
 
@@ -21,6 +21,11 @@ export function UsersTab() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [listError, setListError] = useState('');
+  const [importMode, setImportMode] = useState<UserImportMode>('add');
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importSummary, setImportSummary] = useState<UserImportSummary | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState('');
   const offsetRef = useRef(0);
   const seqRef = useRef(0);
   const debouncedSearch = useDebounce(search, 300);
@@ -124,6 +129,30 @@ export function UsersTab() {
     }
   }
 
+  async function previewImport() {
+    if (!importFile) return;
+    setImporting(true); setImportError(''); setImportSummary(null);
+    try {
+      const result = await importAdminUsers(importFile, importMode);
+      setImportSummary(result.summary);
+    } catch (e: any) { setImportError(e.message || t('error')); }
+    finally { setImporting(false); }
+  }
+
+  async function applyImport() {
+    if (!importFile || !importSummary || importSummary.errors.length) return;
+    if (importMode === 'replace' && !window.confirm('Replace will deactivate active users missing from the file. Continue?')) return;
+    setImporting(true); setImportError('');
+    try {
+      await importAdminUsers(importFile, importMode, true);
+      setImportFile(null); setImportSummary(null);
+      const input = document.getElementById('user-import-file') as HTMLInputElement | null;
+      if (input) input.value = '';
+      offsetRef.current = 0; setHasMore(true); load(true);
+    } catch (e: any) { setImportError(e.message || t('error')); }
+    finally { setImporting(false); }
+  }
+
   const roleLabel: Record<string, string> = { all: t('all'), driver: t('driver'), supervisor: t('supervisor'), admin: t('admin') };
 
   return (
@@ -146,6 +175,32 @@ export function UsersTab() {
         <button type="button" className="btn btn--accent" style={{ padding: '8px 16px' }} onClick={openCreate}>
           + {t('add')}
         </button>
+      </div>
+      <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', background: '#fafafa', display: 'grid', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <strong style={{ fontSize: 14 }}>Import users</strong>
+          <select value={importMode} onChange={(e) => { setImportMode(e.target.value as UserImportMode); setImportSummary(null); }} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '7px 10px', fontSize: 13 }}>
+            <option value="add">Add only</option>
+            <option value="modify">Modify only</option>
+            <option value="replace">Replace active list</option>
+          </select>
+          <input id="user-import-file" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(e) => { setImportFile(e.target.files?.[0] || null); setImportSummary(null); setImportError(''); }} />
+          <button type="button" className="btn btn--secondary" onClick={previewImport} disabled={!importFile || importing}>{importing ? 'Checking…' : 'Preview'}</button>
+        </div>
+        <details style={{ fontSize: 12 }}>
+          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Supported Excel/CSV columns</summary>
+          <div className="muted" style={{ paddingTop: 6, lineHeight: 1.6 }}>
+            Required: <strong>Username</strong> (or <strong>Name</strong>/<strong>Name - Surname</strong> or <strong>Email</strong>), <strong>Role</strong>.<br />
+            Optional: <strong>First Name</strong>, <strong>Last Name</strong>, <strong>Fleet ID</strong> (also Fleet or Service Center), <strong>Password</strong>.<br />
+            DHL workbook names are supported: <strong>Name - Surname</strong>, <strong>e-mail</strong>, <strong>Service Center</strong>. Employee ID is ignored. New users need Password. Crossed-out Excel rows are skipped.
+          </div>
+        </details>
+        {importSummary && <div style={{ display: 'grid', gap: 7, fontSize: 13 }}>
+          <span>Preview: {importSummary.sourceRows} rows · {importSummary.add} to add · {importSummary.modify} to modify · {importSummary.deactivate} to deactivate · {importSummary.skippedStruck} crossed-out skipped</span>
+          {importSummary.errors.length > 0 && <div className="alert alert--error">{importSummary.errors.slice(0, 3).join(' · ')}{importSummary.errors.length > 3 ? ` · +${importSummary.errors.length - 3} more` : ''}</div>}
+          {importSummary.errors.length === 0 && <button type="button" className="btn btn--accent" style={{ width: 'fit-content', padding: '7px 14px' }} onClick={applyImport} disabled={importing}>{importing ? 'Importing…' : `Apply ${importMode} import`}</button>}
+        </div>}
+        {importError && <div className="alert alert--error">{importError}</div>}
       </div>
       {listError && <div className="alert alert--error" style={{ margin: 12 }}>{listError}</div>}
       {loading ? (
