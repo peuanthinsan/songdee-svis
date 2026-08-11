@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -84,21 +84,32 @@ export default function ChecklistEditorScreen() {
   const [editingItem, setEditingItem] = useState<ChecklistItem | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const fetchRequestRef = useRef(0);
 
   const fetchItems = useCallback(async () => {
+    const requestId = ++fetchRequestRef.current;
     try {
       setError(null);
-      const data = await apiFetch('/api/admin/checklist');
-      setItems(Array.isArray(data) ? data : (data.items ?? []));
+      const data = await apiFetch(
+        `/api/admin/checklist?vehicleType=${encodeURIComponent(filterVehicleType)}` +
+        `&frequency=${encodeURIComponent(filterFrequency)}&all=1`
+      );
+      const nextItems: ChecklistItem[] = Array.isArray(data) ? data : (data.items ?? []);
+      if (requestId === fetchRequestRef.current) setItems(nextItems);
     } catch (err: any) {
-      setError(err.message || t('general.error'));
+      if (requestId === fetchRequestRef.current) {
+        setError(err.message || t('general.error'));
+      }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (requestId === fetchRequestRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-  }, []);
+  }, [filterVehicleType, filterFrequency, t]);
 
   useEffect(() => {
+    setLoading(true);
     fetchItems();
   }, [fetchItems]);
 
@@ -128,7 +139,7 @@ export default function ChecklistEditorScreen() {
       ...EMPTY_FORM,
       vehicleType: filterVehicleType,
       frequency: filterFrequency,
-      sortOrder: String(filteredItems.length + 1),
+      sortOrder: String(items.reduce((max, item) => Math.max(max, item.sort_order), 0) + 1),
     });
     setModalVisible(true);
   };
@@ -168,7 +179,7 @@ export default function ChecklistEditorScreen() {
     setSaving(true);
     try {
       if (editingItem) {
-        const updated = await apiFetch('/api/admin/checklist', {
+        await apiFetch('/api/admin/checklist', {
           method: 'PUT',
           body: JSON.stringify({
             id: editingItem.id,
@@ -179,13 +190,11 @@ export default function ChecklistEditorScreen() {
             sortOrder: sortNum,
           }),
         });
-        setItems((prev) =>
-          prev.map((item) => (item.id === editingItem.id ? { ...item, ...updated } : item))
-        );
         closeModal();
+        await fetchItems();
         Alert.alert('', t('admin.checklist.updated'));
       } else {
-        const created = await apiFetch('/api/admin/checklist', {
+        await apiFetch('/api/admin/checklist', {
           method: 'POST',
           body: JSON.stringify({
             vehicleType,
@@ -195,8 +204,8 @@ export default function ChecklistEditorScreen() {
             sortOrder: sortNum,
           }),
         });
-        setItems((prev) => [...prev, created]);
         closeModal();
+        await fetchItems();
         Alert.alert('', t('admin.checklist.created'));
       }
     } catch (err: any) {
@@ -219,7 +228,7 @@ export default function ChecklistEditorScreen() {
           onPress: async () => {
             try {
               await apiFetch(`/api/admin/checklist?id=${item.id}`, { method: 'DELETE' });
-              setItems((prev) => prev.filter((i) => i.id !== item.id));
+              await fetchItems();
               Alert.alert('', t('admin.checklist.deleted'));
             } catch (err: any) {
               const msg = err.message || '';
@@ -279,8 +288,27 @@ export default function ChecklistEditorScreen() {
       <View style={styles.container}>
         {/* Filter tabs */}
         <View style={styles.filtersWrap}>
-          {/* Vehicle type toggle */}
+          {/* Frequency toggle */}
           <View style={styles.toggleRow}>
+            {FREQUENCIES.map((freq) => {
+              const active = filterFrequency === freq;
+              return (
+                <TouchableOpacity
+                  key={freq}
+                  style={[styles.toggleBtn, active && styles.toggleBtnActive]}
+                  onPress={() => setFilterFrequency(freq)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.toggleText, active && styles.toggleTextActive]}>
+                    {frequencyLabel(t, freq)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Vehicle type toggle */}
+          <View style={[styles.toggleRow, { marginTop: spacing.xs }]}>
             {VEHICLE_TYPES.map((vt) => {
               const active = filterVehicleType === vt;
               return (
@@ -298,25 +326,6 @@ export default function ChecklistEditorScreen() {
                   />
                   <Text style={[styles.toggleText, active && styles.toggleTextActive]}>
                     {vehicleTypeLabel(t, vt)}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* Frequency toggle */}
-          <View style={[styles.toggleRow, { marginTop: spacing.xs }]}>
-            {FREQUENCIES.map((freq) => {
-              const active = filterFrequency === freq;
-              return (
-                <TouchableOpacity
-                  key={freq}
-                  style={[styles.toggleBtn, active && styles.toggleBtnActive]}
-                  onPress={() => setFilterFrequency(freq)}
-                  activeOpacity={0.75}
-                >
-                  <Text style={[styles.toggleText, active && styles.toggleTextActive]}>
-                    {frequencyLabel(t, freq)}
                   </Text>
                 </TouchableOpacity>
               );
@@ -342,6 +351,7 @@ export default function ChecklistEditorScreen() {
         {/* Add button row */}
         <View style={styles.addRow}>
           <Text style={styles.countText}>
+            {frequencyLabel(t, filterFrequency)} · {vehicleTypeLabel(t, filterVehicleType)} ·{' '}
             {filteredItems.length} {locale === 'th' ? 'รายการ' : 'items'}
           </Text>
           <TouchableOpacity style={styles.addButton} onPress={openAdd} activeOpacity={0.8}>
@@ -451,26 +461,6 @@ export default function ChecklistEditorScreen() {
                 autoCapitalize="sentences"
               />
 
-              {/* Vehicle Type picker */}
-              <Text style={styles.fieldLabel}>{t('admin.checklist.vehicleType')}</Text>
-              <View style={styles.chipRow}>
-                {VEHICLE_TYPES.map((vt) => {
-                  const active = form.vehicleType === vt;
-                  return (
-                    <TouchableOpacity
-                      key={vt}
-                      style={[styles.chip, active && styles.chipActive]}
-                      onPress={() => setForm((f) => ({ ...f, vehicleType: vt }))}
-                      activeOpacity={0.75}
-                    >
-                      <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                        {vehicleTypeLabel(t, vt)}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
               {/* Frequency picker */}
               <Text style={styles.fieldLabel}>{t('admin.checklist.frequency')}</Text>
               <View style={styles.chipRow}>
@@ -485,6 +475,26 @@ export default function ChecklistEditorScreen() {
                     >
                       <Text style={[styles.chipText, active && styles.chipTextActive]}>
                         {frequencyLabel(t, freq)}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Vehicle Type picker */}
+              <Text style={styles.fieldLabel}>{t('admin.checklist.vehicleType')}</Text>
+              <View style={styles.chipRow}>
+                {VEHICLE_TYPES.map((vt) => {
+                  const active = form.vehicleType === vt;
+                  return (
+                    <TouchableOpacity
+                      key={vt}
+                      style={[styles.chip, active && styles.chipActive]}
+                      onPress={() => setForm((f) => ({ ...f, vehicleType: vt }))}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                        {vehicleTypeLabel(t, vt)}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -637,8 +647,10 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   countText: {
+    flex: 1,
     fontSize: 13,
     color: colors.textSecondary,
+    marginRight: spacing.sm,
   },
   addButton: {
     flexDirection: 'row',

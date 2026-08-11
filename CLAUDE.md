@@ -79,10 +79,10 @@ database**, not "migration pending". New write scripts must call `requireConfirm
   company admin, not cross-company platform admin.
 - **i18n:** UI strings exist in TWO files with non-corresponding keys
   (`web/src/i18n.ts` AND `lib/i18n.ts`) — change both, Thai and English.
-- **Git:** this checkout carries deliberate uncommitted WIP (vercel.json, package.json,
-  seed scripts) — NEVER `git add -A`; commit only your task's files by explicit
-  pathspec. Parallel sessions are real: check `git status` + `git log -1` immediately
-  before committing.
+- **Git:** this checkout may carry deliberate uncommitted WIP, and which files are dirty
+  changes over time — do not trust a list written here. NEVER `git add -A`; commit only
+  your task's files by explicit pathspec. Parallel sessions are real: check `git status`
+  + `git log -1` immediately before committing.
 - **Deploy:** a push to `main` IS a production release — automatic, no human step, no
   manual command. Never end a response with a `vercel deploy --prod` block for this repo;
   the pipeline already deployed, and a manual run would only add a redundant second

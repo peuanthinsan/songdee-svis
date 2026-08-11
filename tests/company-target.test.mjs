@@ -8,7 +8,7 @@ import test from 'node:test';
 // export shape changes to something the lexer can't analyze), fall back to
 // importing the default and destructuring it instead — this file is the
 // proof of whichever form actually works.
-import { selectCompanySlug, DEFAULT_COMPANY_SLUG } from '../scripts/lib/company-target.js';
+import { selectCompanySlug, resolveCompany, DEFAULT_COMPANY_SLUG } from '../scripts/lib/company-target.js';
 
 assert.equal(typeof selectCompanySlug, 'function', 'named import of selectCompanySlug failed to resolve via cjs-module-lexer');
 assert.equal(DEFAULT_COMPANY_SLUG, 'dhl');
@@ -123,7 +123,7 @@ test('--company=acme, env=dhl, dry-run: proceeds with acme/flag + ignore-note', 
   assert.equal(threw, false);
   assert.deepEqual(result, { slug: 'acme', source: 'flag' });
   assert.equal(logs.length, 1);
-  assert.match(logs[0], /Note: SVIS_COMPANY_SLUG=dhl ignored; --company=acme takes precedence\./);
+  assert.match(logs[0], /Note: SVIS_COMPANY_SLUG="dhl" ignored; --company=acme takes precedence\./);
 });
 
 test('--company=acme, env=dhl, write: proceeds with acme/flag + ignore-note', () => {
@@ -133,7 +133,7 @@ test('--company=acme, env=dhl, write: proceeds with acme/flag + ignore-note', ()
   assert.equal(threw, false);
   assert.deepEqual(result, { slug: 'acme', source: 'flag' });
   assert.equal(logs.length, 1);
-  assert.match(logs[0], /Note: SVIS_COMPANY_SLUG=dhl ignored; --company=acme takes precedence\./);
+  assert.match(logs[0], /Note: SVIS_COMPANY_SLUG="dhl" ignored; --company=acme takes precedence\./);
 });
 
 test('--company=acme, env=acme, dry-run: proceeds with acme/flag, NO note (env equals flag)', () => {
@@ -217,7 +217,7 @@ test('--company=dhl, env=acme, dry-run: proceeds with dhl/flag + ignore-note', (
   assert.equal(threw, false);
   assert.deepEqual(result, { slug: 'dhl', source: 'flag' });
   assert.equal(logs.length, 1);
-  assert.match(logs[0], /Note: SVIS_COMPANY_SLUG=acme ignored; --company=dhl takes precedence\./);
+  assert.match(logs[0], /Note: SVIS_COMPANY_SLUG="acme" ignored; --company=dhl takes precedence\./);
 });
 
 test('--company=dhl, env=acme, write: proceeds with dhl/flag + ignore-note', () => {
@@ -227,7 +227,7 @@ test('--company=dhl, env=acme, write: proceeds with dhl/flag + ignore-note', () 
   assert.equal(threw, false);
   assert.deepEqual(result, { slug: 'dhl', source: 'flag' });
   assert.equal(logs.length, 1);
-  assert.match(logs[0], /Note: SVIS_COMPANY_SLUG=acme ignored; --company=dhl takes precedence\./);
+  assert.match(logs[0], /Note: SVIS_COMPANY_SLUG="acme" ignored; --company=dhl takes precedence\./);
 });
 
 test('--company=dhl, env="", dry-run: proceeds with dhl/flag + empty-env note', () => {
@@ -305,7 +305,7 @@ test('--company=a --company=b (repeated flag) refuses (M3), never last-wins', ()
     selectCompanySlug({ argv: [...BASE_ARGV, '--company=a', '--company=b'], env: {}, dryRun: false })
   );
   assert.equal(threw, true);
-  assert.match(error.message, /--company was given more than once \(a, b\); tenant selection is/);
+  assert.match(error.message, /--company was given more than once \("a", "b"\); tenant selection is/);
 });
 
 // ── Unclaimed lookalike token ────────────────────────────────────────
@@ -324,4 +324,86 @@ test('--companyfoo=x with env=acme on a write still refuses (M5), because the fl
   );
   assert.equal(threw, true);
   assert.match(error.message, /Refusing to write with a tenant taken from the environment/);
+});
+
+// ── Refusal diagnostics and stale-caller protection ──────────────────
+
+test('identical repeated --company values still refuse without claiming ambiguity', () => {
+  const { error, threw } = captureLogs(() =>
+    selectCompanySlug({ argv: [...BASE_ARGV, '--company=dhl', '--company= dhl '], env: {}, dryRun: false })
+  );
+  assert.equal(threw, true);
+  assert.match(error.message, /given more than once with the same value/);
+  assert.match(error.message, /\("dhl", " dhl "\)/);
+  assert.doesNotMatch(error.message, /ambiguous/);
+});
+
+test('bare plus valued --company reports the actual ambiguity and every raw value', () => {
+  const { error, threw } = captureLogs(() =>
+    selectCompanySlug({ argv: [...BASE_ARGV, '--company', '--company=a', '--company=b'], env: {}, dryRun: false })
+  );
+  assert.equal(threw, true);
+  assert.match(error.message, /--company was given both without a value and as --company="a", "b"; tenant/);
+  assert.match(error.message, /ambiguous/);
+  assert.doesNotMatch(error.message, /silently fall back/);
+});
+
+test('environment refusal preserves the raw quoted value while naming the trimmed slug', () => {
+  const { error, threw } = captureLogs(() =>
+    selectCompanySlug({ argv: BASE_ARGV, env: { SVIS_COMPANY_SLUG: '  acme  ' }, dryRun: false })
+  );
+  assert.equal(threw, true);
+  assert.match(error.message, /SVIS_COMPANY_SLUG="  acme  " would have selected company "acme" without the/);
+});
+
+test('flag override note preserves the raw quoted environment value', () => {
+  const { result, threw, logs } = captureLogs(() =>
+    selectCompanySlug({ argv: [...BASE_ARGV, '--company=acme'], env: { SVIS_COMPANY_SLUG: '  dhl  ' }, dryRun: true })
+  );
+  assert.equal(threw, false);
+  assert.deepEqual(result, { slug: 'acme', source: 'flag' });
+  assert.deepEqual(logs, ['Note: SVIS_COMPANY_SLUG="  dhl  " ignored; --company=acme takes precedence.']);
+});
+
+test('operator values with quotes and whitespace are JSON-escaped in diagnostics', () => {
+  const rawValue = 'a" b';
+  const { error, threw } = captureLogs(() =>
+    selectCompanySlug({ argv: [...BASE_ARGV, `--company=${rawValue}`], env: {}, dryRun: false })
+  );
+  assert.equal(threw, true);
+  assert.match(error.message, /contains whitespace/);
+  assert.ok(error.message.includes(JSON.stringify(rawValue)));
+});
+
+test('selectCompanySlug rejects the removed slug option instead of silently defaulting', () => {
+  const { error, threw } = captureLogs(() => selectCompanySlug({ slug: 'acme' }));
+  assert.equal(threw, true);
+  assert.match(error.message, /^selectCompanySlug no longer accepts a `slug` option\./);
+  assert.match(error.message, /Pass the tenant as --company=<slug> in argv instead\./);
+});
+
+test('resolveCompany rejects the removed slug option before issuing SQL', async () => {
+  const calls = [];
+  const fakeSql = (...args) => {
+    calls.push(args);
+    throw new Error('SQL must not run');
+  };
+
+  await assert.rejects(
+    () => resolveCompany(fakeSql, { slug: 'acme' }),
+    (error) => {
+      assert.match(error.message, /^resolveCompany no longer accepts a `slug` option\./);
+      return true;
+    }
+  );
+  assert.deepEqual(calls, []);
+});
+
+test('unknown option diagnostics are deterministic and list the accepted keys', () => {
+  const { error, threw } = captureLogs(() =>
+    selectCompanySlug({ zzz: 1, compnay: 'x', argv: BASE_ARGV })
+  );
+  assert.equal(threw, true);
+  assert.match(error.message, /^selectCompanySlug received unknown option\(s\): compnay, zzz\./);
+  assert.match(error.message, /Accepted options: argv, env, dryRun\.$/);
 });

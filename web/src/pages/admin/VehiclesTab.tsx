@@ -1,31 +1,98 @@
-import { useEffect, useState } from 'react';
-import { AdminVehicle, fetchAdminVehicles, createAdminVehicle, updateAdminVehicle, deleteAdminVehicle } from '../../api';
+import { useEffect, useRef, useState } from 'react';
+import { AdminFleet, AdminVehicle, fetchAdminFleets, fetchAdminVehicles, createAdminVehicle, updateAdminVehicle, deleteAdminVehicle } from '../../api';
 import { t } from '../../i18n';
+import { useDebounce } from '../../useDebounce';
 
 type Form = { plateNumber: string; vehicleType: string; fleetId: string; fleetManagerEmail: string; vendorEmail: string };
 const BLANK: Form = { plateNumber: '', vehicleType: 'car', fleetId: '', fleetManagerEmail: '', vendorEmail: '' };
+const PAGE_LIMIT = 100;
 
 export function VehiclesTab() {
   const [vehicles, setVehicles] = useState<AdminVehicle[]>([]);
+  const [fleets, setFleets] = useState<AdminFleet[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [search, setSearch] = useState('');
+  const [fleetFilter, setFleetFilter] = useState('all');
   const [modal, setModal] = useState<'create' | AdminVehicle | null>(null);
   const [form, setForm] = useState<Form>(BLANK);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [listError, setListError] = useState('');
+  const offsetRef = useRef(0);
+  const seqRef = useRef(0);
+  const debouncedSearch = useDebounce(search, 300);
 
   // Bulk vendor-email state
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkEmail, setBulkEmail] = useState('');
   const [bulkSaving, setBulkSaving] = useState(false);
+  const vehiclesRef = useRef<AdminVehicle[]>([]);
+  useEffect(() => { vehiclesRef.current = vehicles; }, [vehicles]);
 
-  function load() {
-    setLoading(true);
-    fetchAdminVehicles({ limit: 500 })
-      .then((data) => { setVehicles(data); setLoading(false); })
-      .catch(() => { setError(t('error')); setLoading(false); });
+  function load(reset: boolean) {
+    const seq = ++seqRef.current;
+    if (reset) {
+      setLoading(true);
+      setLoadingMore(false);
+    } else {
+      setLoadingMore(true);
+    }
+    setListError('');
+    const offset = reset ? 0 : offsetRef.current;
+    fetchAdminVehicles({
+      limit: PAGE_LIMIT,
+      offset,
+      search: debouncedSearch.trim() || undefined,
+      fleetId: fleetFilter === 'all' ? undefined : fleetFilter,
+    })
+      .then((data) => {
+        if (seq !== seqRef.current) return;
+        if (reset) {
+          setVehicles(data);
+          setSelected((prev) => new Set(data.filter((v) => prev.has(v.id)).map((v) => v.id)));
+          offsetRef.current = data.length;
+        } else {
+          setVehicles((prev) => {
+            const existingIds = new Set(prev.map((v) => v.id));
+            return [...prev, ...data.filter((v) => !existingIds.has(v.id))];
+          });
+          offsetRef.current = offset + data.length;
+        }
+        setHasMore(data.length >= PAGE_LIMIT);
+        setLoading(false);
+        setLoadingMore(false);
+      })
+      .catch(() => {
+        if (seq !== seqRef.current) return;
+        setListError(t('error'));
+        if (reset) {
+          setVehicles([]);
+          setSelected(new Set());
+          setHasMore(false);
+          offsetRef.current = 0;
+        }
+        setLoading(false);
+        setLoadingMore(false);
+      });
   }
-  useEffect(load, []);
+
+  useEffect(() => {
+    offsetRef.current = 0;
+    setHasMore(true);
+    setSelected(new Set());
+    load(true);
+  }, [debouncedSearch, fleetFilter]);
+
+  useEffect(() => {
+    fetchAdminFleets().then(setFleets).catch(() => {});
+  }, []);
+
+  function loadMore() {
+    if (!hasMore || loading || loadingMore) return;
+    load(false);
+  }
 
   function openCreate() { setForm(BLANK); setModal('create'); setError(''); }
   function openEdit(v: AdminVehicle) {
@@ -37,13 +104,15 @@ export function VehiclesTab() {
     setSaving(true); setError('');
     try {
       if (modal === 'create') {
-        const v = await createAdminVehicle({ ...form, fleetManagerEmail: form.fleetManagerEmail || undefined, vendorEmail: form.vendorEmail || undefined });
-        setVehicles((prev) => [v, ...prev]);
+        await createAdminVehicle({ ...form, fleetManagerEmail: form.fleetManagerEmail || undefined, vendorEmail: form.vendorEmail || undefined });
       } else if (modal) {
-        const updated = await updateAdminVehicle(modal.id, { plateNumber: form.plateNumber, vehicleType: form.vehicleType, fleetId: form.fleetId, fleetManagerEmail: form.fleetManagerEmail, vendorEmail: form.vendorEmail });
-        setVehicles((prev) => prev.map((v) => v.id === updated.id ? { ...v, ...updated } : v));
+        await updateAdminVehicle(modal.id, { plateNumber: form.plateNumber, vehicleType: form.vehicleType, fleetId: form.fleetId, fleetManagerEmail: form.fleetManagerEmail, vendorEmail: form.vendorEmail });
       }
       setModal(null);
+      offsetRef.current = 0;
+      setHasMore(true);
+      load(true);
+      fetchAdminFleets().then(setFleets).catch(() => {});
     } catch (e: any) {
       setError(e.message || t('error'));
     } finally {
@@ -56,6 +125,8 @@ export function VehiclesTab() {
     try {
       await deleteAdminVehicle(v.id);
       setVehicles((prev) => prev.filter((x) => x.id !== v.id));
+      setSelected((prev) => { const next = new Set(prev); next.delete(v.id); return next; });
+      offsetRef.current = Math.max(0, offsetRef.current - 1);
     } catch (e: any) {
       alert(e.message || t('error'));
     }
@@ -63,9 +134,11 @@ export function VehiclesTab() {
 
   async function handleBulkApply() {
     if (!bulkEmail || selected.size === 0) return;
+    const loadedIds = new Set(vehicles.map((v) => v.id));
+    const ids = [...selected].filter((id) => loadedIds.has(id));
+    if (ids.length === 0) return;
     setBulkSaving(true);
     try {
-      const ids = [...selected];
       const settled = await Promise.allSettled(
         ids.map((id) => updateAdminVehicle(id, { vendorEmail: bulkEmail }))
       );
@@ -81,7 +154,8 @@ export function VehiclesTab() {
         const updated = updates.get(v.id);
         return updated ? { ...v, ...updated } : v;
       }));
-      setSelected(failedIds);
+      const stillLoadedIds = new Set(vehiclesRef.current.map((v) => v.id));
+      setSelected(new Set([...failedIds].filter((id) => stillLoadedIds.has(id))));
       if (failedIds.size > 0) {
         alert(`${t('error')} (${failedIds.size}/${ids.length})`);
       } else {
@@ -93,17 +167,13 @@ export function VehiclesTab() {
   }
 
   const typeLabel: Record<string, string> = { car: t('car'), van: t('van'), e_van: t('eVan'), motorcycle: t('motorcycle'), e_bike: t('eBike') };
-  const filtered = vehicles.filter((v) =>
-    !search || [v.plate_number, v.fleet_id, v.vendor_email || ''].some((x) => x.toLowerCase().includes(search.toLowerCase()))
-  );
-
-  const allFilteredSelected = filtered.length > 0 && filtered.every((v) => selected.has(v.id));
+  const allLoadedSelected = vehicles.length > 0 && vehicles.every((v) => selected.has(v.id));
 
   function toggleAll() {
-    if (allFilteredSelected) {
-      setSelected((prev) => { const s = new Set(prev); filtered.forEach((v) => s.delete(v.id)); return s; });
+    if (allLoadedSelected) {
+      setSelected((prev) => { const s = new Set(prev); vehicles.forEach((v) => s.delete(v.id)); return s; });
     } else {
-      setSelected((prev) => { const s = new Set(prev); filtered.forEach((v) => s.add(v.id)); return s; });
+      setSelected((prev) => { const s = new Set(prev); vehicles.forEach((v) => s.add(v.id)); return s; });
     }
   }
 
@@ -113,8 +183,18 @@ export function VehiclesTab() {
 
   return (
     <div className="panel panel--flush">
-      <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 12, alignItems: 'center' }}>
+      <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <h2 style={{ margin: 0, flex: 1 }}>{t('adminVehicles')}</h2>
+        <select
+          value={fleetFilter}
+          onChange={(e) => setFleetFilter(e.target.value)}
+          style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px', fontSize: 14 }}
+        >
+          <option value="all">{t('all')}</option>
+          {fleets.map((fleet) => (
+            <option key={fleet.fleet_id} value={fleet.fleet_id}>{fleet.fleet_id}</option>
+          ))}
+        </select>
         <input
           placeholder={t('search')}
           value={search}
@@ -136,7 +216,7 @@ export function VehiclesTab() {
             onChange={(e) => setBulkEmail(e.target.value)}
             style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px', fontSize: 13, flex: '1 0 200px', minWidth: 0 }}
           />
-          <button type="button" className="btn btn--accent" style={{ padding: '6px 14px', fontSize: 13 }} onClick={handleBulkApply} disabled={bulkSaving || !bulkEmail}>
+          <button type="button" className="btn btn--accent" style={{ padding: '6px 14px', fontSize: 13 }} onClick={handleBulkApply} disabled={bulkSaving || !bulkEmail || loading}>
             {bulkSaving ? '…' : t('applyToSelected')}
           </button>
           <button type="button" className="btn btn--secondary" style={{ padding: '6px 14px', fontSize: 13 }} onClick={() => setSelected(new Set())}>
@@ -145,41 +225,51 @@ export function VehiclesTab() {
         </div>
       )}
 
+      {listError && <div className="alert alert--error" style={{ margin: 12 }}>{listError}</div>}
       {loading ? (
         <p className="muted" style={{ padding: 20 }}>{t('loading')}</p>
       ) : (
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th style={{ width: 36 }}>
-                <input type="checkbox" checked={allFilteredSelected} onChange={toggleAll} />
-              </th>
-              <th>{t('plateNumber')}</th>
-              <th>{t('vehicleType')}</th>
-              <th>{t('fleet')}</th>
-              <th>{t('vendorEmail')}</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 && <tr><td colSpan={6} className="table-empty">{t('noResults')}</td></tr>}
-            {filtered.map((v) => (
-              <tr key={v.id}>
-                <td>
-                  <input type="checkbox" checked={selected.has(v.id)} onChange={() => toggleOne(v.id)} />
-                </td>
-                <td><strong>{v.plate_number}</strong></td>
-                <td>{typeLabel[v.vehicle_type] || v.vehicle_type}</td>
-                <td>{v.fleet_id}</td>
-                <td className="muted" style={{ fontSize: 13 }}>{v.vendor_email || '—'}</td>
-                <td style={{ whiteSpace: 'nowrap' }}>
-                  <button type="button" className="btn btn--secondary" style={{ padding: '5px 10px', marginRight: 6 }} onClick={() => openEdit(v)}>{t('editAction')}</button>
-                  <button type="button" className="btn" style={{ padding: '5px 10px', background: '#fde', color: '#c00' }} onClick={() => handleDelete(v)}>{t('deleteAction')}</button>
-                </td>
+        <>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th style={{ width: 36 }}>
+                  <input type="checkbox" checked={allLoadedSelected} onChange={toggleAll} />
+                </th>
+                <th>{t('plateNumber')}</th>
+                <th>{t('vehicleType')}</th>
+                <th>{t('fleet')}</th>
+                <th>{t('vendorEmail')}</th>
+                <th></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {vehicles.length === 0 && <tr><td colSpan={6} className="table-empty">{t('noResults')}</td></tr>}
+              {vehicles.map((v) => (
+                <tr key={v.id}>
+                  <td>
+                    <input type="checkbox" checked={selected.has(v.id)} onChange={() => toggleOne(v.id)} />
+                  </td>
+                  <td><strong>{v.plate_number}</strong></td>
+                  <td>{typeLabel[v.vehicle_type] || v.vehicle_type}</td>
+                  <td>{v.fleet_id}</td>
+                  <td className="muted" style={{ fontSize: 13 }}>{v.vendor_email || '—'}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <button type="button" className="btn btn--secondary" style={{ padding: '5px 10px', marginRight: 6 }} onClick={() => openEdit(v)}>{t('editAction')}</button>
+                    <button type="button" className="btn" style={{ padding: '5px 10px', background: '#fde', color: '#c00' }} onClick={() => handleDelete(v)}>{t('deleteAction')}</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {hasMore && (
+            <div style={{ padding: 16, textAlign: 'center' }}>
+              <button type="button" className="btn btn--secondary" onClick={loadMore} disabled={loadingMore}>
+                {loadingMore ? t('loading') : t('loadMore')}
+              </button>
+            </div>
+          )}
+        </>
       )}
       {modal !== null && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'grid', placeItems: 'center', zIndex: 100 }}>

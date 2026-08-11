@@ -38,7 +38,9 @@ export default function VehicleDetail() {
       const v = await apiFetch(`/api/vehicles?id=${id}`);
       setVehicle(v);
 
-      const logs = await apiFetch(`/api/inspections?vehicleId=${id}&date=${today}`);
+      const logs = await apiFetch(
+        `/api/inspections?vehicleId=${id}&date=${today}&frequency=daily`
+      );
       setInspection(logs.length > 0 ? logs[0] : null);
     } catch (err) {
       console.error('Failed to load vehicle detail:', err);

@@ -31,6 +31,41 @@ const DEFAULT_COMPANY_SLUG = 'dhl';
 
 const COMPANY_FLAG_PREFIX = '--company=';
 
+const SELECT_COMPANY_SLUG_OPTIONS = ['argv', 'env', 'dryRun'];
+const RESOLVE_COMPANY_OPTIONS = ['argv', 'env', 'dryRun'];
+
+/**
+ * Reject any option key an `opts` object was not documented to accept.
+ * Exists because the module used to accept a `slug` override that bypassed
+ * source validation (a caller could select a tenant without naming it on the
+ * command line); deleting that parameter without also rejecting it would
+ * leave a stale caller silently falling through to default/env semantics —
+ * a silent wrong-tenant path, which is exactly what this module exists to
+ * prevent. `slug` gets a message naming it specifically since it is the
+ * likely mistake; any other unrecognized key gets a generic message.
+ *
+ * @param {string} functionName name to attribute the error to (its own, not a callee's)
+ * @param {object} opts the raw options object as received, before defaulting
+ * @param {string[]} allowedKeys keys that function is documented to accept
+ */
+function assertKnownOptions(functionName, opts, allowedKeys) {
+  const unknownKeys = Object.keys(opts).filter((key) => !allowedKeys.includes(key));
+  if (unknownKeys.length === 0) return;
+
+  if (unknownKeys.includes('slug')) {
+    throw new Error(
+      `${functionName} no longer accepts a \`slug\` option. It was removed because it\n` +
+      'bypassed source validation, letting a caller select a tenant without naming it\n' +
+      'on the command line. Pass the tenant as --company=<slug> in argv instead.'
+    );
+  }
+
+  throw new Error(
+    `${functionName} received unknown option(s): ${unknownKeys.slice().sort().join(', ')}.\n` +
+    `Accepted options: ${allowedKeys.join(', ')}.`
+  );
+}
+
 /**
  * Parse the tenant slug a script is allowed to use, given how it was invoked.
  * Pure and synchronous so it is unit-testable without a database or a child
@@ -43,10 +78,27 @@ const COMPANY_FLAG_PREFIX = '--company=';
  * @param {boolean} [opts.dryRun] true when the script performs no writes
  * @returns {{ slug: string, source: 'flag' | 'env' | 'default' }}
  */
-function selectCompanySlug({ argv = process.argv, env = process.env, dryRun = false } = {}) {
+function selectCompanySlug(opts = {}) {
+  assertKnownOptions('selectCompanySlug', opts, SELECT_COMPANY_SLUG_OPTIONS);
+  const { argv = process.argv, env = process.env, dryRun = false } = opts;
+
   const companyTokens = argv.filter((token) => token === '--company' || token.startsWith(COMPANY_FLAG_PREFIX));
 
   const hasBareFlag = companyTokens.some((token) => token === '--company');
+  const valueTokens = companyTokens.filter((token) => token.startsWith(COMPANY_FLAG_PREFIX));
+
+  // A bare --company alongside a valued token cannot fall through to an
+  // ambient tenant, but it is still ambiguous. Report that exact condition
+  // and list every valued token so the operator can fix the command once.
+  if (hasBareFlag && valueTokens.length > 0) {
+    const rawValues = valueTokens.map((token) => token.slice(COMPANY_FLAG_PREFIX.length));
+    const quotedList = rawValues.map((value) => JSON.stringify(value)).join(', ');
+    throw new Error(
+      `--company was given both without a value and as --company=${quotedList}; tenant\n` +
+      'selection is ambiguous. Re-run with exactly one --company=<slug>.'
+    );
+  }
+
   if (hasBareFlag) {
     throw new Error(
       '--company requires a value in the form --company=<slug> (no space form).\n' +
@@ -56,12 +108,22 @@ function selectCompanySlug({ argv = process.argv, env = process.env, dryRun = fa
     );
   }
 
-  const valueTokens = companyTokens.filter((token) => token.startsWith(COMPANY_FLAG_PREFIX));
-
   if (valueTokens.length > 1) {
-    const values = valueTokens.map((token) => token.slice(COMPANY_FLAG_PREFIX.length));
+    const rawValues = valueTokens.map((token) => token.slice(COMPANY_FLAG_PREFIX.length));
+    const trimmedValues = rawValues.map((value) => value.trim());
+    const allSameValue = trimmedValues.every((value) => value === trimmedValues[0]);
+
+    if (allSameValue) {
+      const quotedRawValues = rawValues.map((value) => JSON.stringify(value)).join(', ');
+      throw new Error(
+        `--company was given more than once with the same value (${quotedRawValues}).\n` +
+        'Remove the duplicate and re-run with exactly one --company=<slug>.'
+      );
+    }
+
+    const quotedRawValues = rawValues.map((value) => JSON.stringify(value)).join(', ');
     throw new Error(
-      `--company was given more than once (${values.join(', ')}); tenant selection is\n` +
+      `--company was given more than once (${quotedRawValues}); tenant selection is\n` +
       'ambiguous. Re-run with exactly one --company=<slug>.'
     );
   }
@@ -77,7 +139,7 @@ function selectCompanySlug({ argv = process.argv, env = process.env, dryRun = fa
     }
     if (/\s/.test(trimmedValue)) {
       throw new Error(
-        `--company=<value> contains whitespace ("${rawValue}"); a company slug cannot\n` +
+        `--company=<value> contains whitespace (${JSON.stringify(rawValue)}); a company slug cannot\n` +
         'contain spaces.\n' +
         'Re-run with --company=<slug>, e.g. --company=dhl.'
       );
@@ -89,7 +151,7 @@ function selectCompanySlug({ argv = process.argv, env = process.env, dryRun = fa
       if (envTrimmed === '') {
         console.log(`Note: empty SVIS_COMPANY_SLUG ignored; --company=${trimmedValue} takes precedence.`);
       } else if (envTrimmed !== trimmedValue) {
-        console.log(`Note: SVIS_COMPANY_SLUG=${envValue} ignored; --company=${trimmedValue} takes precedence.`);
+        console.log(`Note: SVIS_COMPANY_SLUG=${JSON.stringify(envValue)} ignored; --company=${trimmedValue} takes precedence.`);
       }
     }
 
@@ -118,7 +180,7 @@ function selectCompanySlug({ argv = process.argv, env = process.env, dryRun = fa
 
   throw new Error(
     'Refusing to write with a tenant taken from the environment.\n\n' +
-    `SVIS_COMPANY_SLUG=${envTrimmed} would have selected company "${envTrimmed}" without the\n` +
+    `SVIS_COMPANY_SLUG=${JSON.stringify(env.SVIS_COMPANY_SLUG)} would have selected company "${envTrimmed}" without the\n` +
     'tenant appearing anywhere on the command line. A stale exported variable is\n' +
     'how a sync deactivates every vehicle and user in the wrong tenant.\n\n' +
     'Name the tenant explicitly: re-run with --company=<slug> --confirm.\n' +
@@ -143,7 +205,9 @@ function describeSource(source) {
  * @param {boolean} [opts.dryRun] true when the script performs no writes
  * @returns {Promise<{ id: string, slug: string, name: string }>}
  */
-async function resolveCompany(sql, { argv, env, dryRun = false } = {}) {
+async function resolveCompany(sql, opts = {}) {
+  assertKnownOptions('resolveCompany', opts, RESOLVE_COMPANY_OPTIONS);
+  const { argv, env, dryRun = false } = opts;
   const { slug, source } = selectCompanySlug({ argv, env, dryRun });
 
   const rows = await sql`SELECT id, slug, name, is_active FROM companies WHERE slug = ${slug}`;

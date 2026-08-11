@@ -5,13 +5,21 @@ import { verifyAuth, AuthUser } from '../lib/api-auth';
 import { logAudit } from '../lib/audit';
 
 async function handleGet(req: VercelRequest, res: VercelResponse, user: AuthUser) {
-  const { vehicleId, date, since, carryover } = req.query;
+  const { vehicleId, date, since, carryover, frequency } = req.query;
   const sql = neon(process.env.DATABASE_URL!);
 
   try {
     if (!vehicleId) {
       return res.status(400).json({ error: 'vehicleId is required' });
     }
+    const validFrequencies = ['daily', 'weekly', 'post_route'];
+    if (
+      frequency !== undefined &&
+      (typeof frequency !== 'string' || !validFrequencies.includes(frequency))
+    ) {
+      return res.status(400).json({ error: 'Invalid frequency' });
+    }
+    const requestedFrequency = typeof frequency === 'string' ? frequency : null;
 
     // Company scope always applies; non-admins are additionally locked to their fleet.
     const [veh] = await sql`
@@ -38,7 +46,18 @@ async function handleGet(req: VercelRequest, res: VercelResponse, user: AuthUser
     }
 
     let logs;
-    if (vehicleId && date) {
+    if (date && requestedFrequency) {
+      logs = await sql`
+        SELECT il.*, vm.plate_number, vm.vehicle_type
+        FROM inspection_logs il
+        JOIN vehicle_master vm ON vm.id = il.vehicle_id
+        WHERE il.vehicle_id = ${vehicleId as string}
+          AND il.company_id = ${user.companyId}
+          AND il.inspection_date = ${date as string}
+          AND il.frequency = ${requestedFrequency}
+        ORDER BY il.created_at DESC
+      `;
+    } else if (date) {
       logs = await sql`
         SELECT il.*, vm.plate_number, vm.vehicle_type
         FROM inspection_logs il
@@ -48,7 +67,18 @@ async function handleGet(req: VercelRequest, res: VercelResponse, user: AuthUser
           AND il.inspection_date = ${date as string}
         ORDER BY il.created_at DESC
       `;
-    } else if (vehicleId && since) {
+    } else if (since && requestedFrequency) {
+      logs = await sql`
+        SELECT il.*, vm.plate_number, vm.vehicle_type
+        FROM inspection_logs il
+        JOIN vehicle_master vm ON vm.id = il.vehicle_id
+        WHERE il.vehicle_id = ${vehicleId as string}
+          AND il.company_id = ${user.companyId}
+          AND il.inspection_date >= ${since as string}
+          AND il.frequency = ${requestedFrequency}
+        ORDER BY il.created_at DESC
+      `;
+    } else if (since) {
       logs = await sql`
         SELECT il.*, vm.plate_number, vm.vehicle_type
         FROM inspection_logs il
@@ -57,6 +87,17 @@ async function handleGet(req: VercelRequest, res: VercelResponse, user: AuthUser
           AND il.company_id = ${user.companyId}
           AND il.inspection_date >= ${since as string}
         ORDER BY il.created_at DESC
+      `;
+    } else if (requestedFrequency) {
+      logs = await sql`
+        SELECT il.*, vm.plate_number, vm.vehicle_type
+        FROM inspection_logs il
+        JOIN vehicle_master vm ON vm.id = il.vehicle_id
+        WHERE il.vehicle_id = ${vehicleId as string}
+          AND il.company_id = ${user.companyId}
+          AND il.frequency = ${requestedFrequency}
+        ORDER BY il.inspection_date DESC
+        LIMIT 30
       `;
     } else {
       logs = await sql`

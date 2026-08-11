@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -68,6 +68,7 @@ export default function InspectScreen() {
   const [readOnlyInspector, setReadOnlyInspector] = useState('');
   const [checklistError, setChecklistError] = useState(false);
   const [diagramVisible, setDiagramVisible] = useState(false);
+  const checklistRequestRef = useRef(0);
 
   const failCount = checklistItems.filter(ci => results[ci.id] === 'fail').length;
   const hasFailures = failCount > 0;
@@ -138,6 +139,7 @@ export default function InspectScreen() {
 
   async function loadChecklist(vehicleType: string) {
     if (!user?.companyId) return;
+    const requestId = ++checklistRequestRef.current;
     try {
       setChecklistError(false);
       const checklistType = vehicleType === 'e_van' ? 'e_van' : vehicleType;
@@ -160,13 +162,11 @@ export default function InspectScreen() {
           items = cached;
         }
       }
+      if (requestId !== checklistRequestRef.current) return;
       setChecklistItems(items);
 
-      // Pick initial active zone = first zone that has items
-      const firstZone = ZONE_ORDER.find((z) =>
-        ZONE_SECTIONS[z].some((s) => items.some((ci: ChecklistItem) => ci.section === s))
-      );
-      setActiveZone(firstZone ?? null);
+      // Start with the complete checklist. Zones are optional filters.
+      setActiveZone(null);
 
       // Default to NO selection so the driver explicitly marks every item.
       setResults({});
@@ -196,20 +196,19 @@ export default function InspectScreen() {
         let logs;
         if (frequency === 'weekly') {
           const monday = getMondayOfWeekThai();
-          logs = await apiFetch(`/api/inspections?vehicleId=${id}&since=${monday}`);
+          logs = await apiFetch(
+            `/api/inspections?vehicleId=${id}&since=${monday}&frequency=${frequency}`
+          );
         } else {
           const today = getTodayThai();
-          logs = await apiFetch(`/api/inspections?vehicleId=${id}&date=${today}`);
+          logs = await apiFetch(
+            `/api/inspections?vehicleId=${id}&date=${today}&frequency=${frequency}`
+          );
         }
+        if (requestId !== checklistRequestRef.current) return;
 
-        // Filter logs to only match current frequency's checklist items
-        const itemNames = new Set(items.map((ci: ChecklistItem) => ci.item_name_en));
-        const matchingLogs = logs.filter((log: any) =>
-          log.results?.some((r: any) => itemNames.has(r.item_name_en))
-        );
-
-        if (matchingLogs.length > 0) {
-          const existing = matchingLogs[0];
+        if (logs.length > 0) {
+          const existing = logs[0];
           if (existing.inspector_id === user?.id || isAdmin) {
             // This driver's own inspection or admin editing — load in edit mode
             setEditMode(true);
@@ -221,8 +220,8 @@ export default function InspectScreen() {
               const savedPhotos: Record<string, string[]> = {};
               const savedNotes: Record<string, string> = {};
               for (const r of existing.results) {
-                const matchingItem = items.find((ci: ChecklistItem) =>
-                  ci.item_name_th === r.item_name_th || ci.item_name_en === r.item_name_en
+                const matchingItem = items.find(
+                  (ci: ChecklistItem) => ci.id === r.checklist_item_id
                 );
                 if (matchingItem) {
                   savedResults[matchingItem.id] = r.result as ItemResult;
@@ -257,11 +256,12 @@ export default function InspectScreen() {
             setReadOnly(true);
             setReadOnlyInspector(existing.inspector_name);
           }
-        } else {
+        } else if (frequency !== 'post_route') {
           // Fresh inspection: defects still open from earlier inspections default to
           // fail until resolved (client request) — the driver flips them to pass once fixed.
           try {
             const carry = await apiFetch(`/api/inspections?vehicleId=${id}&carryover=1`);
+            if (requestId !== checklistRequestRef.current) return;
             const preFilled: Record<string, ItemResult> = {};
             const ids = new Set<string>();
             for (const c of carry?.items ?? []) {
@@ -289,7 +289,7 @@ export default function InspectScreen() {
       }
     } catch (err) {
       console.error('Failed to load checklist:', err);
-      setChecklistError(true);
+      if (requestId === checklistRequestRef.current) setChecklistError(true);
     }
   }
 
@@ -792,7 +792,7 @@ export default function InspectScreen() {
           zoneStatuses={zoneStatuses}
           zoneFailCounts={zoneFailCounts}
           activeZone={activeZone}
-          onZonePress={setActiveZone}
+          onZonePress={(zone) => setActiveZone((current) => current === zone ? null : zone)}
           zoneLabels={zoneLabels}
           title={t('inspection.vehicleDiagram')}
           diagramVisible={diagramVisible}
@@ -1019,14 +1019,6 @@ export default function InspectScreen() {
                 ))}
               </View>
             )}
-          </View>
-        )}
-
-        {/* All pass */}
-        {allItemsAnswered && !hasFailures && checklistItems.length > 0 && (
-          <View style={styles.allPassRow}>
-            <Ionicons name="checkmark-circle" size={20} color={colors.statusPass} style={{ marginRight: spacing.sm }} />
-            <Text style={styles.allPassText}>{t('inspection.allPass')}</Text>
           </View>
         )}
 
@@ -1855,26 +1847,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-
-  // All pass
-  allPassRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: spacing.md,
-    marginTop: spacing.sm,
-    marginHorizontal: spacing.md,
-    backgroundColor: statusColors.pass.bg,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.statusPass + '30',
-  },
-  allPassText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.statusPass,
   },
 
   // Submit bar

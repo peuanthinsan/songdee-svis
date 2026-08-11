@@ -2,6 +2,9 @@ const { neon } = require('@neondatabase/serverless');
 const bcrypt = require('bcryptjs');
 const { requireConfirmedTarget } = require('./lib/db-target');
 
+// Matches BCRYPT_ROUNDS in lib/api-auth.ts and the other password write paths.
+const BCRYPT_ROUNDS = 12;
+
 async function run() {
   const newPassword = process.env.SVIS_ADMIN_PASSWORD;
   if (!newPassword) {
@@ -17,7 +20,7 @@ async function run() {
     process.exit(1);
   }
 
-  const hash = await bcrypt.hash(newPassword, 10);
+  const hash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
 
   for (const u of admins) {
     await sql`UPDATE users SET password_hash = ${hash} WHERE id = ${u.id}`;

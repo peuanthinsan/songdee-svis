@@ -15,13 +15,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const offset = parseInt(req.query.offset as string) || 0;
       let vehicles;
       if (fleetId && search) {
+        const pattern = `%${search as string}%`;
         vehicles = await sql`
           SELECT id, plate_number, vehicle_type, fleet_id, fleet_manager_email, vendor_email, created_at
           FROM vehicle_master
           WHERE company_id = ${admin.companyId}
             AND fleet_id = ${fleetId as string}
-            AND plate_number ILIKE ${'%' + (search as string) + '%'}
-          ORDER BY plate_number
+            AND (plate_number ILIKE ${pattern} OR vendor_email ILIKE ${pattern})
+          ORDER BY plate_number, id
           LIMIT ${limit} OFFSET ${offset}
         `;
       } else if (fleetId) {
@@ -29,16 +30,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           SELECT id, plate_number, vehicle_type, fleet_id, fleet_manager_email, vendor_email, created_at
           FROM vehicle_master
           WHERE company_id = ${admin.companyId} AND fleet_id = ${fleetId as string}
-          ORDER BY plate_number
+          ORDER BY plate_number, id
           LIMIT ${limit} OFFSET ${offset}
         `;
       } else if (search) {
+        const pattern = `%${search as string}%`;
         vehicles = await sql`
           SELECT id, plate_number, vehicle_type, fleet_id, fleet_manager_email, vendor_email, created_at
           FROM vehicle_master
           WHERE company_id = ${admin.companyId}
-            AND plate_number ILIKE ${'%' + (search as string) + '%'}
-          ORDER BY fleet_id, plate_number
+            AND (plate_number ILIKE ${pattern} OR fleet_id ILIKE ${pattern} OR vendor_email ILIKE ${pattern})
+          ORDER BY fleet_id, plate_number, id
           LIMIT ${limit} OFFSET ${offset}
         `;
       } else {
@@ -46,7 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           SELECT id, plate_number, vehicle_type, fleet_id, fleet_manager_email, vendor_email, created_at
           FROM vehicle_master
           WHERE company_id = ${admin.companyId}
-          ORDER BY fleet_id, plate_number
+          ORDER BY fleet_id, plate_number, id
           LIMIT ${limit} OFFSET ${offset}
         `;
       }
