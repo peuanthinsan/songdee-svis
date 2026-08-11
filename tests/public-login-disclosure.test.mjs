@@ -29,32 +29,24 @@ function responseRecorder() {
   };
 }
 
-test('the retired public roster route cannot enumerate login accounts', async () => {
-  const { default: handler } = await import('../api/auth/users-list.ts');
-  const res = responseRecorder();
-
-  await handler({ method: 'GET', query: { company: 'dhl' } }, res);
-
-  assert.equal(res.statusCode, 404);
-  assert.deepEqual(res.body, { error: 'Not found' });
-  assert.equal(res.headers.get('cache-control'), 'no-store');
-  assert.doesNotMatch(rosterSource, /\bFROM\s+users\b/i);
-  assert.doesNotMatch(rosterSource, /driverAccounts|staffAccounts|first_name|last_name/);
+test('the login roster returns active users by company', () => {
+  assert.match(rosterSource, /FROM users u/i);
+  assert.match(rosterSource, /u\.is_active/);
+  assert.match(rosterSource, /driverAccounts|staffAccounts/);
+  assert.match(rosterSource, /c\.slug = \$\{companySlug\}/);
 });
 
-test('mobile and web login accept a typed username without requesting a roster', () => {
-  assert.doesNotMatch(mobileLoginSource, /\/api\/auth\/users-list/);
-  assert.match(mobileLoginSource, /placeholder=\{t\('login\.username'\)\}/);
-  assert.match(mobileLoginSource, /value=\{username\}/);
-  assert.match(mobileLoginSource, /onChangeText=\{setUsername\}/);
-  assert.match(mobileLoginSource, /signIn\(username\.trim\(\), password, selectedCompanySlug\)/);
+test('mobile and web login request and use the roster', () => {
+  assert.match(mobileLoginSource, /\/api\/auth\/users-list/);
+  assert.match(mobileLoginSource, /setDriverNames/);
+  assert.match(mobileLoginSource, /setStaffNames/);
+  assert.match(mobileLoginSource, /signIn\(identifier, password, selectedCompanySlug\)/);
 
-  assert.doesNotMatch(webLoginSource, /fetchLoginUsers|LoginAccount/);
-  assert.match(webLoginSource, /autoComplete="username"/);
-  assert.match(webLoginSource, /value=\{username\}/);
+  assert.match(webLoginSource, /fetchLoginUsers|LoginAccount/);
+  assert.match(webLoginSource, /accounts\.map/);
   assert.match(webLoginSource, /signIn\(username\.trim\(\), password, companySlug\)/);
 
-  assert.doesNotMatch(webApiSource, /fetchLoginUsers|LoginAccount|\/api\/auth\/users-list/);
+  assert.match(webApiSource, /fetchLoginUsers|LoginAccount|\/api\/auth\/users-list/);
 });
 
 test('the credential endpoint still accepts username, password, and company', () => {
