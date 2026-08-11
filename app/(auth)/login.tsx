@@ -17,7 +17,7 @@ import { Image } from 'expo-image';
 import { colors, spacing, borderRadius, shadows } from '../../constants/theme';
 import { useI18n } from '../../lib/i18n-context';
 import { API_BASE } from '../../lib/api';
-import type { Company } from '../../lib/types';
+import type { Company, LoginAccount } from '../../lib/types';
 
 const DEFAULT_COMPANIES: Company[] = [{
   slug: 'dhl',
@@ -27,8 +27,8 @@ const DEFAULT_COMPANIES: Company[] = [{
   accentColor: '#D40511',
 }];
 
-function nameToUsername(name: string): string {
-  return name.toLowerCase().replace(/\s+/g, '_');
+function normalizeUsername(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, '_');
 }
 
 type LoginMode = 'driver' | 'staff';
@@ -37,18 +37,18 @@ export default function LoginScreen() {
   const { signIn } = useAuth();
   const { t } = useI18n();
   const [mode, setMode] = useState<LoginMode>('driver');
-  const [selectedName, setSelectedName] = useState('');
-  const [selectedStaffName, setSelectedStaffName] = useState('');
+  const [selectedDriver, setSelectedDriver] = useState<LoginAccount | null>(null);
+  const [selectedStaff, setSelectedStaff] = useState<LoginAccount | null>(null);
+  const [manualEntry, setManualEntry] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
-  const [manualUsername, setManualUsername] = useState(false);
   const [showCompanyPicker, setShowCompanyPicker] = useState(false);
   const [search, setSearch] = useState('');
-  const [driverNames, setDriverNames] = useState<string[]>([]);
-  const [staffNames, setStaffNames] = useState<string[]>([]);
+  const [driverAccounts, setDriverAccounts] = useState<LoginAccount[]>([]);
+  const [staffAccounts, setStaffAccounts] = useState<LoginAccount[]>([]);
   const [showPassword, setShowPassword] = useState(false);
   const [companies, setCompanies] = useState<Company[]>(DEFAULT_COMPANIES);
   const [selectedCompanySlug, setSelectedCompanySlug] = useState('dhl');
@@ -66,25 +66,55 @@ export default function LoginScreen() {
   }, []);
 
   useEffect(() => {
-    setSelectedName(''); setSelectedStaffName(''); setUsername(''); setSearch(''); setManualUsername(false);
+    setSelectedDriver(null);
+    setSelectedStaff(null);
+    setUsername('');
+    setDriverAccounts([]);
+    setStaffAccounts([]);
     fetch(`${API_BASE}/api/auth/users-list?company=${encodeURIComponent(selectedCompanySlug)}`)
       .then((r) => r.json())
       .then((data) => {
-        const nextDrivers = data.drivers || [];
-        const nextStaff = data.staff || [];
-        setDriverNames(nextDrivers);
-        setStaffNames(nextStaff);
-        if (!nextDrivers.length && !nextStaff.length) setManualUsername(true);
+        if (data.driverAccounts?.length) {
+          setDriverAccounts(data.driverAccounts);
+        } else if (data.drivers?.length) {
+          setDriverAccounts(data.drivers.map((name: string) => ({ username: normalizeUsername(name), displayName: name, role: 'driver' as const })));
+        }
+        if (data.staffAccounts?.length) {
+          setStaffAccounts(data.staffAccounts);
+        } else if (data.staff?.length) {
+          setStaffAccounts(data.staff.map((name: string) => ({ username: normalizeUsername(name), displayName: name, role: 'supervisor' as const })));
+        }
       })
-      .catch(() => { setDriverNames([]); setStaffNames([]); setManualUsername(true); });
+      .catch(() => {});
   }, [selectedCompanySlug]);
 
-  const nameList = mode === 'driver' ? driverNames : staffNames;
-  const currentName = mode === 'driver' ? selectedName : selectedStaffName;
-  const filteredNames = nameList.filter((name) => name.toLowerCase().includes(search.toLowerCase()));
-  const identifier = currentName ? nameToUsername(currentName) : username.trim();
+  const accountList = mode === 'driver' ? driverAccounts : staffAccounts;
+  const currentAccount = mode === 'driver' ? selectedDriver : selectedStaff;
+  const filteredAccounts = accountList.filter((account) =>
+    account.displayName.toLowerCase().includes(search.toLowerCase()) ||
+    account.username.toLowerCase().includes(search.toLowerCase())
+  );
+  const identifier = manualEntry ? normalizeUsername(username) : currentAccount?.username ?? '';
 
   const canSubmit = !loading && password.length > 0 && identifier.length > 0;
+
+  function closeAccountPicker() {
+    setShowPicker(false);
+    setSearch('');
+  }
+
+  function setLoginMode(nextMode: LoginMode) {
+    setMode(nextMode);
+    setManualEntry(false);
+    setUsername('');
+    setError('');
+  }
+
+  function toggleManualEntry() {
+    setManualEntry((current) => !current);
+    setUsername('');
+    setError('');
+  }
 
   async function handleSignIn() {
     if (!canSubmit) return;
@@ -145,19 +175,19 @@ export default function LoginScreen() {
 
           <View style={styles.form}>
             <View style={styles.modeToggle}>
-              <TouchableOpacity style={[styles.modeBtn, mode === 'driver' && styles.modeBtnActive]} onPress={() => { setMode('driver'); setManualUsername(false); setUsername(''); setError(''); }}>
+              <TouchableOpacity style={[styles.modeBtn, mode === 'driver' && styles.modeBtnActive]} onPress={() => setLoginMode('driver')}>
                 <Text style={[styles.modeBtnText, mode === 'driver' && styles.modeBtnTextActive]}>{t('login.driverMode')}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.modeBtn, mode === 'staff' && styles.modeBtnActive]} onPress={() => { setMode('staff'); setManualUsername(false); setUsername(''); setError(''); }}>
+              <TouchableOpacity style={[styles.modeBtn, mode === 'staff' && styles.modeBtnActive]} onPress={() => setLoginMode('staff')}>
                 <Text style={[styles.modeBtnText, mode === 'staff' && styles.modeBtnTextActive]}>{t('login.staffMode')}</Text>
               </TouchableOpacity>
             </View>
             <View style={styles.inputWrapper}>
               <Ionicons name="person-outline" size={20} color={colors.textTertiary} style={styles.inputIcon} />
-              {manualUsername ? (
+              {manualEntry ? (
                 <TextInput
                   style={styles.input}
-                  placeholder={t('login.username')}
+                  placeholder={t('login.usernameHint')}
                   placeholderTextColor={colors.textTertiary}
                   value={username}
                   onChangeText={setUsername}
@@ -167,16 +197,16 @@ export default function LoginScreen() {
                 />
               ) : (
                 <TouchableOpacity style={styles.pickerInner} onPress={() => setShowPicker(true)}>
-                  <Text style={[styles.pickerText, !currentName && styles.pickerPlaceholder]}>{currentName || (mode === 'driver' ? t('login.selectDriver') : t('login.selectStaff'))}</Text>
+                  <Text style={[styles.pickerText, !currentAccount && styles.pickerPlaceholder]}>{currentAccount?.displayName || (mode === 'driver' ? t('login.selectDriver') : t('login.selectStaff'))}</Text>
                   <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
                 </TouchableOpacity>
               )}
             </View>
             <TouchableOpacity
-              onPress={() => { setManualUsername(!manualUsername); setUsername(''); setSelectedName(''); setSelectedStaffName(''); }}
-              disabled={!manualUsername && nameList.length === 0}
+              style={styles.manualToggle}
+              onPress={toggleManualEntry}
             >
-              <Text style={styles.manualToggleText}>{manualUsername ? t('login.useUserPicker') : t('login.enterUsernameManually')}</Text>
+              <Text style={styles.manualToggleText}>{manualEntry ? t('login.chooseFromList') : t('login.enterUsernameManually')}</Text>
             </TouchableOpacity>
 
             <View style={styles.inputWrapper}>
@@ -240,19 +270,16 @@ export default function LoginScreen() {
             </View>
             <TextInput style={styles.searchInput} placeholder={t('login.searchDriver')} value={search} onChangeText={setSearch} />
             <FlatList
-              data={filteredNames}
-              keyExtractor={(item) => item}
+              data={filteredAccounts}
+              keyExtractor={(item) => item.username}
               keyboardShouldPersistTaps="handled"
-              ListEmptyComponent={<Text style={styles.emptyUserText}>{t('login.searchDriver')}</Text>}
               renderItem={({ item }) => (
-                <TouchableOpacity style={styles.userOption} onPress={() => { if (mode === 'driver') setSelectedName(item); else setSelectedStaffName(item); setManualUsername(false); setUsername(''); setShowPicker(false); setSearch(''); }}>
-                  <Text style={styles.userOptionText}>{item}</Text>
+                <TouchableOpacity style={[styles.userOption, item.username === currentAccount?.username && styles.userOptionSelected]} onPress={() => { if (mode === 'driver') setSelectedDriver(item); else setSelectedStaff(item); closeAccountPicker(); }}>
+                  <Text style={styles.userOptionText}>{item.displayName}</Text>
+                  {item.username === currentAccount?.username && <Ionicons name="checkmark" size={20} color={colors.accent} />}
                 </TouchableOpacity>
               )}
             />
-            <TouchableOpacity style={styles.manualUserButton} onPress={() => { setManualUsername(true); setSelectedName(''); setSelectedStaffName(''); setUsername(''); setShowPicker(false); }}>
-              <Text style={styles.manualUserText}>{t('login.enterUsernameManually')}</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -472,11 +499,13 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   userOption: { borderBottomWidth: 1, borderBottomColor: colors.border, padding: spacing.md },
+  userOptionSelected: { backgroundColor: colors.accent + '12', flexDirection: 'row', justifyContent: 'space-between' },
   userOptionText: { color: colors.textPrimary, fontSize: 15 },
   emptyUserText: { color: colors.textTertiary, padding: spacing.lg, textAlign: 'center' },
   manualUserButton: { borderTopWidth: 1, borderTopColor: colors.border, padding: spacing.md },
   manualUserText: { color: colors.accent, fontWeight: '700', textAlign: 'center' },
   manualToggleText: { color: colors.accent, fontSize: 13, fontWeight: '700', paddingVertical: 4, textAlign: 'center' },
+  manualToggle: { alignItems: 'center', paddingVertical: 2 },
   companyOption: {
     alignItems: 'center',
     borderBottomColor: colors.border,

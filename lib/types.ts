@@ -10,6 +10,12 @@ export type Company = {
   accentColor: string;
 };
 
+export type LoginAccount = {
+  username: string;
+  displayName: string;
+  role: 'driver' | 'supervisor' | 'admin';
+};
+
 export const VEHICLE_TYPE_LABELS: Record<VehicleType, string> = {
   car: 'Car',
   van: 'Van',
