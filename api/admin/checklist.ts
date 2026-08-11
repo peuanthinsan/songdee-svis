@@ -23,6 +23,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         items = await sql`
           SELECT * FROM checklist_items
           WHERE company_id = ${admin.companyId}
+            AND is_active
             AND vehicle_type = ${vehicleType as string}
             AND frequency = ${frequency as string}
           ORDER BY sort_order, id
@@ -32,6 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         items = await sql`
           SELECT * FROM checklist_items
           WHERE company_id = ${admin.companyId}
+            AND is_active
             AND vehicle_type = ${vehicleType as string}
           ORDER BY frequency, sort_order, id
           LIMIT ${limit} OFFSET ${offset}
@@ -40,6 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         items = await sql`
           SELECT * FROM checklist_items
           WHERE company_id = ${admin.companyId}
+            AND is_active
           ORDER BY frequency, vehicle_type, sort_order, id
           LIMIT ${limit} OFFSET ${offset}
         `;
@@ -110,7 +113,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           AND ci.company_id = ${admin.companyId}
       `;
       if (usage[0].count > 0) {
-        return res.status(409).json({ error: 'Cannot delete: item has inspection history' });
+        const [retired] = await sql`
+          UPDATE checklist_items
+          SET is_active = false
+          WHERE id = ${id as string} AND company_id = ${admin.companyId}
+          RETURNING id
+        `;
+        if (!retired) return res.status(404).json({ error: 'Item not found' });
+        return res.status(200).json({ deleted: true, retired: true });
       }
       const result = await sql`
         DELETE FROM checklist_items

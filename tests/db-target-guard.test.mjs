@@ -225,7 +225,7 @@ const CLASS_A_SCRIPTS = [
 ];
 
 // No dry-run mode at all — the guard always demands --confirm.
-const NO_DRY_RUN_SCRIPTS = ['migrate-020.js', 'reset-admin-password.js', 'reset-all-passwords.js'];
+const NO_DRY_RUN_SCRIPTS = ['migrate-020.js', 'migrate-021.js', 'reset-admin-password.js', 'reset-all-passwords.js'];
 
 // Class B: dry-run legitimately connects to read current state before it can
 // print a preview.
