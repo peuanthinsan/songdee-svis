@@ -70,8 +70,8 @@ test('checklist editors retrieve 501 rows in one stable snapshot', async () => {
   assert.match(checklistApi, /ORDER BY frequency, vehicle_type, sort_order, id/);
   assert.match(mobileChecklist, /&all=1/);
   assert.match(webApi, /new URLSearchParams\(\{ all: '1' \}\)/);
-  assert.match(webChecklist, /vehicleTypeOverride \?\? \(filterType \|\| BLANK\.vehicleType\)/);
-  assert.match(webChecklist, /frequencyOverride \?\? \(filterFreq \|\| BLANK\.frequency\)/);
+  assert.match(webChecklist, /const vehicleType = activeVehicleType/);
+  assert.match(webChecklist, /const frequency = activeFrequency/);
   assert.match(webChecklist, /await load\(\)/);
 });
 

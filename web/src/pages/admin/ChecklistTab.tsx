@@ -17,8 +17,8 @@ const BLANK: Form = { itemNameTh: '', itemNameEn: '', vehicleType: 'car', freque
 export function ChecklistTab() {
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterType, setFilterType] = useState<VehicleType | ''>('');
-  const [filterFreq, setFilterFreq] = useState<ChecklistFrequency | ''>('');
+  const [activeFrequency, setActiveFrequency] = useState<ChecklistFrequency>('daily');
+  const [activeVehicleType, setActiveVehicleType] = useState<VehicleType>('car');
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState<'create' | ChecklistItem | null>(null);
   const [form, setForm] = useState<Form>(BLANK);
@@ -54,9 +54,9 @@ export function ChecklistTab() {
     void load();
   }, [load]);
 
-  function openCreate(vehicleTypeOverride?: VehicleType, frequencyOverride?: ChecklistFrequency) {
-    const vehicleType = vehicleTypeOverride ?? (filterType || BLANK.vehicleType);
-    const frequency = frequencyOverride ?? (filterFreq || BLANK.frequency);
+  function openCreate() {
+    const vehicleType = activeVehicleType;
+    const frequency = activeFrequency;
     const nextSortOrder = items
       .filter((item) => item.vehicle_type === vehicleType && item.frequency === frequency)
       .reduce((max, item) => Math.max(max, item.sort_order), 0) + 1;
@@ -79,6 +79,8 @@ export function ChecklistTab() {
         await updateChecklistItem({ id: (modal as ChecklistItem).id, ...form, sortOrder });
       }
       setModal(null);
+      setActiveFrequency(form.frequency);
+      setActiveVehicleType(form.vehicleType);
       await load();
     } catch (e: any) {
       setError(e.message || t('error'));
@@ -100,28 +102,37 @@ export function ChecklistTab() {
   const typeLabel: Record<VehicleType, string> = { car: t('car'), van: t('van'), e_van: t('eVan'), motorcycle: t('motorcycle'), e_bike: t('eBike') };
   const freqLabel: Record<ChecklistFrequency, string> = { daily: t('daily'), weekly: t('weekly'), post_route: t('postRoute') };
   const groupedItems = useMemo(
-    () => groupChecklistItems(items, {
-      vehicleType: filterType,
-      frequency: filterFreq,
-      search,
-    }),
-    [filterFreq, filterType, items, search],
+    () => groupChecklistItems(items, { search }),
+    [items, search],
   );
+  const activeFrequencyGroup = groupedItems.find((group) => group.frequency === activeFrequency);
+  const activeItems = activeFrequencyGroup?.vehicleGroups.find((group) => group.vehicleType === activeVehicleType)?.items ?? [];
+
+  function selectAdjacentTab<T extends string>(
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    values: readonly T[],
+    currentValue: T,
+    onSelect: (value: T) => void,
+  ) {
+    const currentIndex = values.indexOf(currentValue);
+    let nextIndex: number | undefined;
+    if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % values.length;
+    if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + values.length) % values.length;
+    if (event.key === 'Home') nextIndex = 0;
+    if (event.key === 'End') nextIndex = values.length - 1;
+    if (nextIndex === undefined) return;
+
+    event.preventDefault();
+    onSelect(values[nextIndex]);
+    event.currentTarget.parentElement
+      ?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[nextIndex]
+      ?.focus();
+  }
 
   return (
     <div className="panel panel--flush">
       <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
         <h2 style={{ margin: 0, flex: 1 }}>{t('adminChecklist')}</h2>
-        <select value={filterFreq} onChange={(e) => setFilterFreq(e.target.value as ChecklistFrequency | '')}
-          style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '7px 10px', fontSize: 13 }}>
-          <option value="">{t('all')} {t('frequency')}</option>
-          {CHECKLIST_FREQUENCIES.map((frequency) => <option key={frequency} value={frequency}>{freqLabel[frequency]}</option>)}
-        </select>
-        <select value={filterType} onChange={(e) => setFilterType(e.target.value as VehicleType | '')}
-          style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '7px 10px', fontSize: 13 }}>
-          <option value="">{t('all')} {t('vehicleType')}</option>
-          {CHECKLIST_VEHICLE_TYPES.map((vehicleType) => <option key={vehicleType} value={vehicleType}>{typeLabel[vehicleType]}</option>)}
-        </select>
         <input placeholder={t('search')} value={search} onChange={(e) => setSearch(e.target.value)}
           style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '7px 10px', fontSize: 13 }} />
         <button type="button" className="btn btn--accent" style={{ padding: '8px 16px' }} onClick={() => openCreate()} disabled={loading}>
@@ -129,63 +140,95 @@ export function ChecklistTab() {
         </button>
       </div>
       {loadError && <div className="alert alert--error" style={{ margin: '16px 20px 0' }}>{loadError}</div>}
-      {loading ? <p className="muted" style={{ padding: 20 }}>{t('loading')}</p> : groupedItems.length === 0 ? (
-        <div className="table-empty">{t('noResults')}</div>
-      ) : (
-        <div className="checklist-groups">
-          {groupedItems.map((frequencyGroup) => (
-            <section className="checklist-frequency-group" key={frequencyGroup.frequency}>
-              <header className="checklist-frequency-group__header">
-                <div>
-                  <span className="checklist-group-kicker">{t('frequency')}</span>
-                  <h3>{freqLabel[frequencyGroup.frequency]}</h3>
-                </div>
-                <span className="checklist-count">{t('itemCount', { count: String(frequencyGroup.itemCount) })}</span>
-              </header>
-              <div className="checklist-vehicle-groups">
-                {frequencyGroup.vehicleGroups.map((vehicleGroup) => (
-                  <section className="checklist-vehicle-group" key={vehicleGroup.vehicleType}>
-                    <header className="checklist-vehicle-group__header">
-                      <div>
-                        <span className="checklist-group-kicker">{t('vehicleType')}</span>
-                        <h4>{typeLabel[vehicleGroup.vehicleType]}</h4>
-                      </div>
-                      <div className="checklist-vehicle-group__actions">
-                        <span className="checklist-count">{t('itemCount', { count: String(vehicleGroup.items.length) })}</span>
-                        <button
-                          type="button"
-                          className="btn btn--secondary btn--sm"
-                          onClick={() => openCreate(vehicleGroup.vehicleType, frequencyGroup.frequency)}
-                        >
-                          + {t('add')}
-                        </button>
-                      </div>
-                    </header>
-                    <div className="table-scroll">
-                      <table className="data-table checklist-group-table">
-                        <thead>
-                          <tr><th>#</th><th>{lang === 'th' ? t('nameTh') : t('nameEn')}</th><th>{t('sortOrder')}</th><th></th></tr>
-                        </thead>
-                        <tbody>
-                          {vehicleGroup.items.map((item, index) => (
-                            <tr key={item.id}>
-                              <td className="muted">{index + 1}</td>
-                              <td className="checklist-item-name">{lang === 'th' ? item.item_name_th : item.item_name_en}</td>
-                              <td className="muted">{item.sort_order}</td>
-                              <td className="checklist-row-actions">
-                                <button type="button" className="btn btn--secondary btn--sm" onClick={() => openEdit(item)}>{t('editAction')}</button>
-                                <button type="button" className="btn btn--sm checklist-delete-button" onClick={() => handleDelete(item)}>{t('deleteAction')}</button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </section>
-                ))}
+      {loading ? <p className="muted" style={{ padding: 20 }}>{t('loading')}</p> : (
+        <div className="checklist-tab-layout">
+          <div className="checklist-tab-section">
+            <span className="checklist-group-kicker">{t('frequency')}</span>
+            <div className="checklist-tablist" role="tablist" aria-label={t('frequency')}>
+              {CHECKLIST_FREQUENCIES.map((frequency) => {
+                const count = groupedItems.find((group) => group.frequency === frequency)?.itemCount ?? 0;
+                const isActive = frequency === activeFrequency;
+                return (
+                  <button
+                    type="button"
+                    role="tab"
+                    id={`checklist-frequency-${frequency}`}
+                    aria-controls="checklist-tab-panel"
+                    aria-selected={isActive}
+                    tabIndex={isActive ? 0 : -1}
+                    className={`checklist-tab${isActive ? ' checklist-tab--active' : ''}`}
+                    key={frequency}
+                    onClick={() => setActiveFrequency(frequency)}
+                    onKeyDown={(event) => selectAdjacentTab(event, CHECKLIST_FREQUENCIES, activeFrequency, setActiveFrequency)}
+                  >
+                    <span>{freqLabel[frequency]}</span>
+                    <span className="checklist-tab__count">{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="checklist-tab-section">
+            <span className="checklist-group-kicker">{t('vehicleType')}</span>
+            <div className="checklist-tablist checklist-tablist--secondary" role="tablist" aria-label={t('vehicleType')}>
+              {CHECKLIST_VEHICLE_TYPES.map((vehicleType) => {
+                const count = activeFrequencyGroup?.vehicleGroups.find((group) => group.vehicleType === vehicleType)?.items.length ?? 0;
+                const isActive = vehicleType === activeVehicleType;
+                return (
+                  <button
+                    type="button"
+                    role="tab"
+                    id={`checklist-vehicle-${vehicleType}`}
+                    aria-controls="checklist-tab-panel"
+                    aria-selected={isActive}
+                    tabIndex={isActive ? 0 : -1}
+                    className={`checklist-tab checklist-tab--secondary${isActive ? ' checklist-tab--active' : ''}`}
+                    key={vehicleType}
+                    onClick={() => setActiveVehicleType(vehicleType)}
+                    onKeyDown={(event) => selectAdjacentTab(event, CHECKLIST_VEHICLE_TYPES, activeVehicleType, setActiveVehicleType)}
+                  >
+                    <span>{typeLabel[vehicleType]}</span>
+                    <span className="checklist-tab__count">{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <section
+            className="checklist-tab-panel"
+            id="checklist-tab-panel"
+            role="tabpanel"
+            aria-labelledby={`checklist-frequency-${activeFrequency} checklist-vehicle-${activeVehicleType}`}
+          >
+            <header className="checklist-tab-panel__header">
+              <h3>{freqLabel[activeFrequency]} · {typeLabel[activeVehicleType]}</h3>
+              <span className="checklist-count">{t('itemCount', { count: String(activeItems.length) })}</span>
+            </header>
+            {activeItems.length === 0 ? <div className="table-empty">{t('noResults')}</div> : (
+              <div className="table-scroll">
+                <table className="data-table checklist-group-table">
+                  <thead>
+                    <tr><th>#</th><th>{lang === 'th' ? t('nameTh') : t('nameEn')}</th><th>{t('sortOrder')}</th><th></th></tr>
+                  </thead>
+                  <tbody>
+                    {activeItems.map((item, index) => (
+                      <tr key={item.id}>
+                        <td className="muted">{index + 1}</td>
+                        <td className="checklist-item-name">{lang === 'th' ? item.item_name_th : item.item_name_en}</td>
+                        <td className="muted">{item.sort_order}</td>
+                        <td className="checklist-row-actions">
+                          <button type="button" className="btn btn--secondary btn--sm" onClick={() => openEdit(item)}>{t('editAction')}</button>
+                          <button type="button" className="btn btn--sm checklist-delete-button" onClick={() => handleDelete(item)}>{t('deleteAction')}</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </section>
-          ))}
+            )}
+          </section>
         </div>
       )}
       {modal !== null && (
