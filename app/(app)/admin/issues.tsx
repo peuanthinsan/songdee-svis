@@ -307,7 +307,7 @@ export default function AdminIssuesScreen() {
             <Ionicons name="download-outline" size={16} color={colors.white} />
           )}
           <Text style={styles.exportBtnText}>
-            {exporting ? 'Exporting…' : 'Export'}
+            {exporting ? t('issues.exporting') : t('issues.export')}
           </Text>
         </TouchableOpacity>
       </View>

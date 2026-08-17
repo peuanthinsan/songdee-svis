@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AdminUser, fetchAdminUsers, createAdminUser, updateAdminUser, deleteAdminUser, importAdminUsers, UserImportMode, UserImportSummary } from '../../api';
+import { AdminUser, fetchAdminUsers, createAdminUser, updateAdminUser, deleteAdminUser, importAdminUsers, UserImportMode, UserImportSummary, downloadExport } from '../../api';
 import { t } from '../../i18n';
 import { useDebounce } from '../../useDebounce';
 
@@ -26,6 +26,7 @@ export function UsersTab() {
   const [importSummary, setImportSummary] = useState<UserImportSummary | null>(null);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState('');
+  const [exporting, setExporting] = useState(false);
   const offsetRef = useRef(0);
   const seqRef = useRef(0);
   const debouncedSearch = useDebounce(search, 300);
@@ -153,6 +154,20 @@ export function UsersTab() {
     finally { setImporting(false); }
   }
 
+  async function exportUsers() {
+    setExporting(true);
+    try {
+      const params = new URLSearchParams();
+      if (roleFilter !== 'all') params.set('role', roleFilter);
+      if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
+      await downloadExport(`/api/admin/users/export?${params.toString()}`, 'users.xlsx');
+    } catch (e: any) {
+      alert(e.message || t('exportFailed'));
+    } finally {
+      setExporting(false);
+    }
+  }
+
   const roleLabel: Record<string, string> = { all: t('all'), driver: t('driver'), supervisor: t('supervisor'), admin: t('admin') };
 
   return (
@@ -174,6 +189,9 @@ export function UsersTab() {
         />
         <button type="button" className="btn btn--accent" style={{ padding: '8px 16px' }} onClick={openCreate}>
           + {t('add')}
+        </button>
+        <button type="button" className="btn btn--secondary" style={{ padding: '8px 16px' }} onClick={exportUsers} disabled={exporting}>
+          {exporting ? '…' : t('export')}
         </button>
       </div>
       <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', background: '#fafafa', display: 'grid', gap: 10 }}>

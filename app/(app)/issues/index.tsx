@@ -323,7 +323,7 @@ export default function IssuesScreen() {
           activeOpacity={0.7}
         >
           <Ionicons name="download-outline" size={16} color="#fff" />
-          <Text style={styles.exportBtnText}>Export</Text>
+          <Text style={styles.exportBtnText}>{t('issues.export')}</Text>
         </TouchableOpacity>
       </View>
 
