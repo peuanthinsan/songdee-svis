@@ -35,7 +35,7 @@ export function isImageBuffer(buf: Buffer): boolean {
 }
 
 export const MAX_UPLOAD_SIZE = 10 * 1024 * 1024; // 10 MB
-export const MIN_PASSWORD_LENGTH = 8;
+export const MIN_PASSWORD_LENGTH = 7;
 
 /**
  * SSRF egress guard for server-side fetches of client-supplied URLs (e.g. defect photos

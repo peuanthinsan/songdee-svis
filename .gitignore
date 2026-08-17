@@ -73,3 +73,4 @@ store-assets/screenshots/
 .serena/
 .superpowers/
 docs/superpowers/
+.env*

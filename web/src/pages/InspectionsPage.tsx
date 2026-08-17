@@ -28,6 +28,7 @@ import {
   type InspectionZone,
 } from '../inspection-workflow';
 import { getLang, t } from '../i18n';
+import { formatDateThai } from '../lib/format-date';
 
 type PhotoDraft = { id: string; url: string; file?: File };
 
@@ -497,8 +498,8 @@ export function InspectionsPage() {
                   <span className="inspection-vehicle-card__meta">
                     {vehicle.fleet_id} · {t(VEHICLE_TYPE_I18N_KEYS[vehicle.vehicle_type] as any)}
                   </span>
-                  <span className={`inspection-vehicle-card__status inspection-vehicle-card__status--${vehicle.daily_status}`}>
-                    {vehicle.daily_status === 'checked' ? t('checkedToday') : t('pendingToday')}
+                  <span className={`inspection-vehicle-card__status inspection-vehicle-card__status--${vehicle.daily_result === 'fail' ? 'failed' : vehicle.daily_status}`}>
+                    {vehicle.daily_result === 'fail' ? t('failedToday') : vehicle.daily_status === 'checked' ? t('checkedToday') : t('pendingToday')}
                   </span>
                 </button>
               );
@@ -802,7 +803,7 @@ export function InspectionsPage() {
               <>
                 <div className="inspection-selected-vehicle__title">
                   <h2>{selectedVehicle.plate_number}</h2>
-                  <span>{selectedVehicle.daily_status === 'checked' ? t('checkedToday') : t('pendingToday')}</span>
+                  <span>{selectedVehicle.daily_result === 'fail' ? t('failedToday') : selectedVehicle.daily_status === 'checked' ? t('checkedToday') : t('pendingToday')}</span>
                 </div>
                 <dl>
                   <div><dt>{t('fleet')}</dt><dd>{selectedVehicle.fleet_id}</dd></div>
@@ -832,7 +833,7 @@ export function InspectionsPage() {
                   <div className="inspection-saved-row__top">
                     <div>
                       <strong>{frequencyLabel(log.frequency)}</strong>
-                      <span>{log.inspection_date}</span>
+                      <span>{formatDateThai(log.inspection_date)}</span>
                     </div>
                     <span className={`inspection-saved-status inspection-saved-status--${log.overall_status}`}>
                       {savedStatus(log)}

@@ -179,7 +179,7 @@ export default function VehiclesScreen() {
 
   const checked = vehicles.filter(v => v.today_status === 'checked').length;
   const displayed = vehicles.length;
-  const pct = total > 0 ? Math.round((checked / displayed) * 100) : 0;
+  const pct = total > 0 ? Math.round((checked / total) * 100) : 0;
 
   return (
     <View style={styles.container}>

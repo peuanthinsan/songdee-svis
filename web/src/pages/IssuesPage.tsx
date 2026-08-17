@@ -4,6 +4,7 @@ import { fetchIssues, type IssueRow } from '../api';
 import { useAuth } from '../AuthContext';
 import { t } from '../i18n';
 import { PhotoGrid } from '../components/PhotoGrid';
+import { formatDateThai, formatDateTimeThai } from '../lib/format-date';
 
 const statuses = ['', 'open', 'in_progress', 'completed'] as const;
 
@@ -29,7 +30,7 @@ function IssueModal({ issue, onClose }: { issue: IssueRow; onClose: () => void }
           <div>
             <h2 style={{ margin:0, fontSize:20 }}>{issue.plate_number}</h2>
             <div style={{ color:'var(--text-secondary)', fontSize:14, marginTop:4 }}>
-              {issue.vehicle_fleet || issue.fleet_id || '—'} &bull; {issue.inspection_date || issue.created_at?.slice(0,10)}
+              {issue.vehicle_fleet || issue.fleet_id || '—'} &bull; {issue.inspection_date ? formatDateThai(issue.inspection_date) : formatDateTimeThai(issue.created_at)}
               {issue.inspector_name ? ` • ${issue.inspector_name}` : ''}
             </div>
           </div>
@@ -146,7 +147,7 @@ export function IssuesPage() {
                       <td><strong>{issue.plate_number}</strong></td>
                       <td>{issue.vehicle_fleet || issue.fleet_id || '—'}</td>
                       <td><span className={`badge badge--${issue.status}`}>{statusLabel(issue.status)}</span></td>
-                      <td>{issue.inspection_date || issue.created_at?.slice(0, 10)}</td>
+                      <td>{issue.inspection_date ? formatDateThai(issue.inspection_date) : formatDateTimeThai(issue.created_at)}</td>
                       <td style={{ textAlign:'center', color: photoCount > 0 ? 'var(--brand-primary)' : 'var(--text-secondary)' }}>
                         {photoCount > 0 ? `📷 ${photoCount}` : '—'}
                       </td>

@@ -481,6 +481,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 .inspection-vehicle-card__status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .inspection-vehicle-card__status--checked { color: var(--status-pass); }
+.inspection-vehicle-card__status--failed { color: var(--status-fail); }
 .inspection-inline-state { padding: 18px 8px; color: var(--text-secondary); font-size: 12px; text-align: center; }
 .inspection-inline-state--large { min-height: 260px; display: grid; place-items: center; }
 

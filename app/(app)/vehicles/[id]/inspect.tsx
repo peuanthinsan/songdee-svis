@@ -588,7 +588,6 @@ export default function InspectScreen() {
           method: 'POST',
           body: formData,
           headers: {
-            'Content-Type': 'multipart/form-data',
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
         });

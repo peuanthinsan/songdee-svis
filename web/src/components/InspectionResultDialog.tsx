@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { fetchInspectionDetail, type InspectionDetail } from '../api';
 import { getLang, t } from '../i18n';
 import { PhotoGrid } from './PhotoGrid';
+import { formatDateThai } from '../lib/format-date';
 
 function frequencyLabel(frequency?: InspectionDetail['frequency']) {
   if (frequency === 'weekly') return t('weekly');
@@ -65,7 +66,7 @@ export function InspectionResultDialog({ inspectionId, onClose }: { inspectionId
               </div>
               <div>
                 <span>{t('date')}</span>
-                <strong>{detail.inspection_date}</strong>
+                <strong>{formatDateThai(detail.inspection_date)}</strong>
               </div>
               <div>
                 <span>{t('inspector')}</span>
