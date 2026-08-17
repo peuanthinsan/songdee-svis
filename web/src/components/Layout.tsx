@@ -4,11 +4,12 @@ import { brand } from '../branding';
 import { useAuth } from '../AuthContext';
 import { getLang, setLang, t } from '../i18n';
 
-type NavIconName = 'dashboard' | 'issues' | 'history' | 'checklist' | 'admin';
+type NavIconName = 'dashboard' | 'inspections' | 'issues' | 'history' | 'checklist' | 'admin';
 
 function NavIcon({ name }: { name: NavIconName }) {
   const paths: Record<NavIconName, ReactNode> = {
     dashboard: <path d="M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Zm10 0h6v6h-6v-6Z" />,
+    inspections: <path d="M9 5h6m-7 3h8M7 3h10a2 2 0 0 1 2 2v16H5V5a2 2 0 0 1 2-2Zm1 10 2 2 4-4m-6 8h8" />,
     issues: <path d="M12 3 2.7 19h18.6L12 3Zm0 5.5v4.8m0 3.2v.1" />,
     history: <path d="M12 4a8 8 0 1 1-7.1 4.3M4 4v4.3h4.3M12 8v4.6l3 1.8" />,
     checklist: <path d="M9 4h6m-7 3h8m-8 4h8m-8 4h5M6 2h12a2 2 0 0 1 2 2v16H4V4a2 2 0 0 1 2-2Z" />,
@@ -71,6 +72,10 @@ export function Layout() {
           <NavLink to="/" end className={({ isActive }) => (isActive ? 'tabs__link tabs__link--active' : 'tabs__link')}>
             <NavIcon name="dashboard" />
             {t('dashboard')}
+          </NavLink>
+          <NavLink to="/inspections" className={({ isActive }) => (isActive ? 'tabs__link tabs__link--active' : 'tabs__link')}>
+            <NavIcon name="inspections" />
+            {t('inspections')}
           </NavLink>
           <NavLink to="/issues" className={({ isActive }) => (isActive ? 'tabs__link tabs__link--active' : 'tabs__link')}>
             <NavIcon name="issues" />
