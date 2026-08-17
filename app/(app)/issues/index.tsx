@@ -136,7 +136,7 @@ export default function IssuesScreen() {
       setRefreshing(false);
       setLoadingMore(false);
     }
-  }, [activeTab]);
+  }, [activeTab, fleetId, isAdmin, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -145,7 +145,7 @@ export default function IssuesScreen() {
       offsetRef.current = 0;
       setHasMore(true);
       fetchIssues(true);
-    }, [activeTab])
+    }, [activeTab, fetchIssues])
   );
 
   const onRefresh = () => {
@@ -238,13 +238,17 @@ export default function IssuesScreen() {
       });
       if (result.status !== 200) throw new Error(`Export failed (${result.status})`);
       setFilterVisible(false);
-      await Sharing.shareAsync(result.uri, {
-        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        dialogTitle: 'Save Issues Report',
-        UTI: 'com.microsoft.excel.xlsx',
-      });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(result.uri, {
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          dialogTitle: t('dashboard.saveReport'),
+          UTI: 'com.microsoft.excel.xlsx',
+        });
+      } else {
+        Alert.alert(t('dashboard.exportSaved'), result.uri);
+      }
     } catch (err: any) {
-      Alert.alert('Export Failed', err.message || 'Could not export report');
+      Alert.alert(t('dashboard.exportFailed'), err.message || t('general.error'));
     } finally {
       setExporting(false);
     }
@@ -258,12 +262,12 @@ export default function IssuesScreen() {
   ];
 
   const periodChips: { key: Period; label: string }[] = [
-    { key: 'all',       label: 'All Time' },
-    { key: 'today',     label: 'Today' },
-    { key: 'week',      label: 'This Week' },
-    { key: 'month',     label: 'This Month' },
-    { key: 'pickMonth', label: 'Pick Month' },
-    { key: 'custom',    label: 'Custom' },
+    { key: 'all',       label: t('dashboard.allTime') },
+    { key: 'today',     label: t('dashboard.today') },
+    { key: 'week',      label: t('dashboard.thisWeek') },
+    { key: 'month',     label: t('dashboard.thisMonth') },
+    { key: 'pickMonth', label: t('dashboard.pickMonth') },
+    { key: 'custom',    label: t('dashboard.custom') },
   ];
 
   const statusLabel = (status: IssueStatus) => {

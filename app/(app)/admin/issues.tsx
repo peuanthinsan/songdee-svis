@@ -162,7 +162,7 @@ export default function AdminIssuesScreen() {
             try {
               await apiFetch(`/api/issues/${issue.id}`, {
                 method: 'PATCH',
-                body: JSON.stringify({ status: 'completed' }),
+                body: JSON.stringify({ status: 'completed', forceClose: true }),
               });
               setSelectedIssue(null);
               setIssues([]);

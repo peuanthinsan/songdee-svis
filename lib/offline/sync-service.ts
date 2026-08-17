@@ -155,7 +155,6 @@ async function uploadPhoto(
     body: formData,
     signal,
     headers: {
-      'Content-Type': 'multipart/form-data',
       Authorization: `Bearer ${expectedToken}`,
     },
   });

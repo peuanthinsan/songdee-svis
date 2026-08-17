@@ -497,8 +497,8 @@ export function InspectionsPage() {
                   <span className="inspection-vehicle-card__meta">
                     {vehicle.fleet_id} · {t(VEHICLE_TYPE_I18N_KEYS[vehicle.vehicle_type] as any)}
                   </span>
-                  <span className={`inspection-vehicle-card__status inspection-vehicle-card__status--${vehicle.daily_status}`}>
-                    {vehicle.daily_status === 'checked' ? t('checkedToday') : t('pendingToday')}
+                  <span className={`inspection-vehicle-card__status inspection-vehicle-card__status--${vehicle.daily_result === 'fail' ? 'failed' : vehicle.daily_status}`}>
+                    {vehicle.daily_result === 'fail' ? t('failedToday') : vehicle.daily_status === 'checked' ? t('checkedToday') : t('pendingToday')}
                   </span>
                 </button>
               );
@@ -802,7 +802,7 @@ export function InspectionsPage() {
               <>
                 <div className="inspection-selected-vehicle__title">
                   <h2>{selectedVehicle.plate_number}</h2>
-                  <span>{selectedVehicle.daily_status === 'checked' ? t('checkedToday') : t('pendingToday')}</span>
+                  <span>{selectedVehicle.daily_result === 'fail' ? t('failedToday') : selectedVehicle.daily_status === 'checked' ? t('checkedToday') : t('pendingToday')}</span>
                 </div>
                 <dl>
                   <div><dt>{t('fleet')}</dt><dd>{selectedVehicle.fleet_id}</dd></div>

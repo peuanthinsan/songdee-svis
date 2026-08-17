@@ -120,7 +120,7 @@ export default function IssueDetailScreen() {
   }
 
   async function uploadPhotos(): Promise<string[]> {
-    // Upload photos in parallel, handling partial failures gracefully
+    // Upload photos in parallel, but never close an issue with incomplete evidence.
     const uploadPromises = completionPhotos.map(async (photoUri) => {
       try {
         const formData = new FormData();
@@ -136,7 +136,6 @@ export default function IssueDetailScreen() {
           method: 'POST',
           body: formData,
           headers: {
-            'Content-Type': 'multipart/form-data',
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
         });
@@ -148,7 +147,10 @@ export default function IssueDetailScreen() {
       }
     });
     const results = await Promise.all(uploadPromises);
-    return results.filter((url): url is string => url !== null);
+    if (results.some((url) => url === null)) {
+      throw new Error(t('issues.uploadFailed'));
+    }
+    return results as string[];
   }
 
   async function handleStartRepair() {
@@ -169,6 +171,10 @@ export default function IssueDetailScreen() {
 
   async function handleCompleteRepair() {
     if (!issue) return;
+    if (completionPhotos.length === 0) {
+      Alert.alert(t('issues.completionPhotoRequired'));
+      return;
+    }
     setUpdating(true);
     try {
       let photoUrls: string[] = [];
