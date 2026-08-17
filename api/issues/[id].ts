@@ -31,6 +31,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (user.role !== 'admin' && issue.vehicle_fleet !== user.fleetId) {
         return res.status(404).json({ error: 'Issue not found' });
       }
+      const failedPhotos = await sql`
+        SELECT ARRAY_AGG(photo_url) AS defect_photo_urls
+        FROM inspection_results ir
+        CROSS JOIN LATERAL unnest(ir.photo_urls) AS photo_url
+        WHERE ir.inspection_id = ${issue.inspection_id}::uuid
+          AND ir.result = 'fail'
+      `;
+      if (failedPhotos[0]?.defect_photo_urls?.length) {
+        issue.defect_photo_urls = failedPhotos[0].defect_photo_urls;
+      }
       return res.status(200).json(issue);
     } catch (error: any) {
       console.error('[API] Error:', error.message);

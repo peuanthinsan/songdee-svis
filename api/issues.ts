@@ -100,6 +100,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         WHERE ir.company_id = ${user.companyId}
         ORDER BY ir.updated_at DESC NULLS LAST, ir.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
     }
+
+    // The linked failed inspection is the source of truth for defect evidence.
+    // Backfill the response from its failed checklist results so an older or
+    // previously refreshed issue row cannot hide photos from the latest fail.
+    const inspectionIds = issues.map((issue: any) => issue.inspection_id).filter(Boolean);
+    if (inspectionIds.length > 0) {
+      const failedPhotos = await sql`
+        SELECT ir.inspection_id,
+               ARRAY_AGG(photo_url) AS defect_photo_urls
+        FROM inspection_results ir
+        CROSS JOIN LATERAL unnest(ir.photo_urls) AS photo_url
+        WHERE ir.inspection_id = ANY(${inspectionIds}::uuid[])
+          AND ir.result = 'fail'
+        GROUP BY ir.inspection_id
+      `;
+      const photosByInspection = new Map<string, string[]>(
+        failedPhotos.map((row: any) => [row.inspection_id, row.defect_photo_urls || []]),
+      );
+      for (const issue of issues) {
+        const photos = photosByInspection.get(issue.inspection_id);
+        if (photos?.length) issue.defect_photo_urls = photos;
+      }
+    }
     res.status(200).json({ issues, limit, offset });
   } catch (error: any) {
     console.error('[API] Error:', error.message);
