@@ -1,0 +1,13 @@
+task_id: claude-thread-consolidation-20260811
+active_root: codex
+delegated_provider: claude-historical-sessions
+provider: codex
+model: UNKNOWN
+effort: UNKNOWN
+phase: verified
+base_ref: 8c6ccc9
+artifact_version: origin/main-2026-08-11
+writer_lease: released
+status: complete
+external_mutations: prohibited
+user_wip_primary_checkout: preserved

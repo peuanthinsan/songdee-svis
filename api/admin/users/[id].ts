@@ -2,6 +2,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
 import { requireAdmin } from '../../../lib/admin-auth';
+import { BCRYPT_ROUNDS } from '../../../lib/api-auth';
+import { MIN_PASSWORD_LENGTH } from '../../../lib/validate';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const admin = await requireAdmin(req, res);
@@ -21,7 +23,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     try {
       if (password) {
-        const passwordHash = await bcrypt.hash(password, 10);
+        if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
+          return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
+        }
+        const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
         await sql`
           UPDATE users SET password_hash = ${passwordHash}, updated_at = NOW()
           WHERE id = ${id} AND company_id = ${admin.companyId}

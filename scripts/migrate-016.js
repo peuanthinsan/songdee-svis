@@ -1,8 +1,18 @@
 const { neon } = require('@neondatabase/serverless');
-require('dotenv').config({ path: '.env.local' });
+const { requireConfirmedTarget } = require('./lib/db-target');
+
+const dryRun = process.argv.includes('--dry-run');
 
 (async () => {
-  const sql = neon(process.env.DATABASE_URL);
+  const { url } = requireConfirmedTarget({
+    action: 'apply migration 016 (vendor_email, vendor_notified_at)',
+    dryRun,
+  });
+  if (dryRun) {
+    console.log('Dry run: migration 016 not applied.');
+    process.exit(0);
+  }
+  const sql = neon(url);
 
   await sql`ALTER TABLE vehicle_master ADD COLUMN IF NOT EXISTS vendor_email TEXT`;
   console.log('✓ vehicle_master.vendor_email added');

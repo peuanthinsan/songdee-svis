@@ -5,13 +5,21 @@ import { verifyAuth, AuthUser } from '../lib/api-auth';
 import { logAudit } from '../lib/audit';
 
 async function handleGet(req: VercelRequest, res: VercelResponse, user: AuthUser) {
-  const { vehicleId, date, since, carryover } = req.query;
+  const { vehicleId, date, since, carryover, frequency } = req.query;
   const sql = neon(process.env.DATABASE_URL!);
 
   try {
     if (!vehicleId) {
       return res.status(400).json({ error: 'vehicleId is required' });
     }
+    const validFrequencies = ['daily', 'weekly', 'post_route'];
+    if (
+      frequency !== undefined &&
+      (typeof frequency !== 'string' || !validFrequencies.includes(frequency))
+    ) {
+      return res.status(400).json({ error: 'Invalid frequency' });
+    }
+    const requestedFrequency = typeof frequency === 'string' ? frequency : null;
 
     // Company scope always applies; non-admins are additionally locked to their fleet.
     const [veh] = await sql`
@@ -38,7 +46,18 @@ async function handleGet(req: VercelRequest, res: VercelResponse, user: AuthUser
     }
 
     let logs;
-    if (vehicleId && date) {
+    if (date && requestedFrequency) {
+      logs = await sql`
+        SELECT il.*, vm.plate_number, vm.vehicle_type
+        FROM inspection_logs il
+        JOIN vehicle_master vm ON vm.id = il.vehicle_id
+        WHERE il.vehicle_id = ${vehicleId as string}
+          AND il.company_id = ${user.companyId}
+          AND il.inspection_date = ${date as string}
+          AND il.frequency = ${requestedFrequency}
+        ORDER BY il.created_at DESC
+      `;
+    } else if (date) {
       logs = await sql`
         SELECT il.*, vm.plate_number, vm.vehicle_type
         FROM inspection_logs il
@@ -48,7 +67,18 @@ async function handleGet(req: VercelRequest, res: VercelResponse, user: AuthUser
           AND il.inspection_date = ${date as string}
         ORDER BY il.created_at DESC
       `;
-    } else if (vehicleId && since) {
+    } else if (since && requestedFrequency) {
+      logs = await sql`
+        SELECT il.*, vm.plate_number, vm.vehicle_type
+        FROM inspection_logs il
+        JOIN vehicle_master vm ON vm.id = il.vehicle_id
+        WHERE il.vehicle_id = ${vehicleId as string}
+          AND il.company_id = ${user.companyId}
+          AND il.inspection_date >= ${since as string}
+          AND il.frequency = ${requestedFrequency}
+        ORDER BY il.created_at DESC
+      `;
+    } else if (since) {
       logs = await sql`
         SELECT il.*, vm.plate_number, vm.vehicle_type
         FROM inspection_logs il
@@ -57,6 +87,17 @@ async function handleGet(req: VercelRequest, res: VercelResponse, user: AuthUser
           AND il.company_id = ${user.companyId}
           AND il.inspection_date >= ${since as string}
         ORDER BY il.created_at DESC
+      `;
+    } else if (requestedFrequency) {
+      logs = await sql`
+        SELECT il.*, vm.plate_number, vm.vehicle_type
+        FROM inspection_logs il
+        JOIN vehicle_master vm ON vm.id = il.vehicle_id
+        WHERE il.vehicle_id = ${vehicleId as string}
+          AND il.company_id = ${user.companyId}
+          AND il.frequency = ${requestedFrequency}
+        ORDER BY il.inspection_date DESC
+        LIMIT 30
       `;
     } else {
       logs = await sql`
@@ -180,10 +221,15 @@ async function handlePut(req: VercelRequest, res: VercelResponse, user: AuthUser
       `;
     }
 
-    // If status changed to fail and was previously pass, create an issue report —
-    // unless the vehicle already has one open (a vehicle carries at most one open
-    // issue, so unresolved defects don't re-count on later inspections).
-    if (overallStatus === 'fail' && existing.old_status === 'pass') {
+    const defectPhotoUrls = results
+      .filter((r: any) => r.result === 'fail')
+      .flatMap((r: any) => Array.isArray(r.photoUrls) ? r.photoUrls : []);
+    const issuePhotoUrls = defectPhotoUrls.length > 0 ? defectPhotoUrls : photosArray;
+
+    // Keep one open issue per vehicle, but always create or refresh it when the
+    // saved inspection contains a failure. This also repairs inspections that
+    // were already marked fail before the issue record was created.
+    if (overallStatus === 'fail') {
       const [openIssue] = await sql`
         SELECT id FROM issue_reports
         WHERE vehicle_id = ${existing.vehicle_id}
@@ -191,10 +237,18 @@ async function handlePut(req: VercelRequest, res: VercelResponse, user: AuthUser
           AND status IN ('open', 'in_progress')
         LIMIT 1
       `;
-      if (!openIssue) {
+      if (openIssue) {
+        await sql`
+          UPDATE issue_reports
+          SET inspection_id = ${inspectionId},
+              defect_photo_urls = ${issuePhotoUrls}::text[],
+              updated_at = NOW()
+          WHERE id = ${openIssue.id} AND company_id = ${user.companyId}
+        `;
+      } else {
         await sql`
           INSERT INTO issue_reports (inspection_id, vehicle_id, fleet_id, company_id, defect_photo_urls)
-          VALUES (${inspectionId}, ${existing.vehicle_id}, ${existing.fleet_id}, ${user.companyId}, ${photosArray}::text[])
+          VALUES (${inspectionId}, ${existing.vehicle_id}, ${existing.fleet_id}, ${user.companyId}, ${issuePhotoUrls}::text[])
         `;
       }
     }
@@ -363,6 +417,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     let issueId = null;
     if (overallStatus === 'fail') {
+      const defectPhotoUrls = results
+        .filter((r: any) => r.result === 'fail')
+        .flatMap((r: any) => Array.isArray(r.photoUrls) ? r.photoUrls : []);
+      const issuePhotoUrls = defectPhotoUrls.length > 0 ? defectPhotoUrls : (photoUrls || []);
       // A vehicle carries at most one open issue: a defect still unresolved on the
       // next inspection keeps its existing report instead of opening (and emailing
       // about) a new one, so the defect counts don't grow day by day.
@@ -375,10 +433,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `;
       if (openIssue) {
         issueId = openIssue.id;
+        await sql`
+          UPDATE issue_reports
+          SET inspection_id = ${log.id},
+              defect_photo_urls = ${issuePhotoUrls}::text[],
+              updated_at = NOW()
+          WHERE id = ${openIssue.id} AND company_id = ${user.companyId}
+        `;
       } else {
         const [issue] = await sql`
           INSERT INTO issue_reports (inspection_id, vehicle_id, fleet_id, company_id, defect_photo_urls)
-          VALUES (${log.id}, ${vehicleId}, ${fleetId}, ${user.companyId}, ${photosArray}::text[])
+          VALUES (${log.id}, ${vehicleId}, ${fleetId}, ${user.companyId}, ${issuePhotoUrls}::text[])
           RETURNING id
         `;
         issueId = issue.id;

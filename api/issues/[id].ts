@@ -31,6 +31,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (user.role !== 'admin' && issue.vehicle_fleet !== user.fleetId) {
         return res.status(404).json({ error: 'Issue not found' });
       }
+      const failedPhotos = await sql`
+        SELECT ARRAY_AGG(photo_url) AS defect_photo_urls
+        FROM inspection_results ir
+        CROSS JOIN LATERAL unnest(ir.photo_urls) AS photo_url
+        WHERE ir.inspection_id = ${issue.inspection_id}::uuid
+          AND ir.result = 'fail'
+      `;
+      if (failedPhotos[0]?.defect_photo_urls?.length) {
+        issue.defect_photo_urls = failedPhotos[0].defect_photo_urls;
+      }
       return res.status(200).json(issue);
     } catch (error: any) {
       console.error('[API] Error:', error.message);
@@ -40,7 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method !== 'PATCH') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { status, completionPhotoUrls } = req.body;
+  const { status, completionPhotoUrls, forceClose } = req.body;
 
   if (!VALID_STATUSES.includes(status)) {
     return res.status(400).json({ error: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}` });
@@ -52,7 +62,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // Closing an issue requires proof-of-repair photos (business rule: repair closure needs evidence).
-  if (status === 'completed' && (!Array.isArray(completionPhotoUrls) || completionPhotoUrls.length === 0)) {
+  const isAuthorizedForceClose = forceClose === true && user.role === 'admin';
+  if (status === 'completed' && !isAuthorizedForceClose && (!Array.isArray(completionPhotoUrls) || completionPhotoUrls.length === 0)) {
     return res.status(400).json({ error: 'Completion photo required to close an issue' });
   }
 
@@ -88,7 +99,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       action: 'issue_status_changed',
       entityType: 'issue',
       entityId: id as string,
-      details: { oldStatus: issue.status, newStatus: status },
+      details: { oldStatus: issue.status, newStatus: status, forceClose: isAuthorizedForceClose },
     });
 
     res.status(200).json({ success: true });

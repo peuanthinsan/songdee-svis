@@ -4,12 +4,7 @@ import { brand } from '../branding';
 import { canAccessDashboard, getStoredUser } from '../auth';
 import { useAuth } from '../AuthContext';
 import { t } from '../i18n';
-import {
-  fetchCompanies,
-  fetchLoginUsers,
-  type Company,
-  type LoginAccount,
-} from '../api';
+import { fetchCompanies, fetchLoginUsers, type Company, type LoginAccount } from '../api';
 
 export function LoginPage() {
   const { signIn, signOut, loading, user, isDashboardUser } = useAuth();
@@ -42,32 +37,18 @@ export function LoginPage() {
 
   useEffect(() => {
     let cancelled = false;
-    setUsername('');
-    setPassword('');
-    setAccounts([]);
-    setUsersError(false);
-    setUsersLoading(true);
-    setManualUsername(false);
-
+    setUsername(''); setPassword(''); setAccounts([]); setUsersError(false); setUsersLoading(true); setManualUsername(false);
     fetchLoginUsers(companySlug)
       .then((data) => {
         if (cancelled) return;
-        setAccounts(data.staffAccounts);
-        setUsersLoading(false);
-        if (data.staffAccounts.length === 0) {
-          setManualUsername(true);
-        }
+        setAccounts(data.staffAccounts); setUsersLoading(false);
+        if (data.staffAccounts.length === 0) setManualUsername(true);
       })
       .catch(() => {
         if (cancelled) return;
-        setUsersError(true);
-        setUsersLoading(false);
-        setManualUsername(true);
+        setUsersError(true); setUsersLoading(false); setManualUsername(true);
       });
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [companySlug]);
 
   if (user && isDashboardUser) return <Navigate to="/" replace />;
@@ -115,51 +96,16 @@ export function LoginPage() {
 
           <label>
             {t('username')}
-            {manualUsername ? (
-              <input
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                autoComplete="username"
-                required
-              />
-            ) : (
-              <select
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                autoComplete="username"
-                disabled={usersLoading}
-                required
-              >
-                <option value="" disabled>
-                  {usersLoading ? t('loadingUsers') : t('selectUser')}
-                </option>
-                {accounts.map((account) => (
-                  <option key={account.username} value={account.username}>
-                    {account.displayName} ({account.username})
-                  </option>
-                ))}
+            {manualUsername ? <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required /> : (
+              <select value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" disabled={usersLoading} required>
+                <option value="" disabled>{usersLoading ? t('loadingUsers') : t('selectUser')}</option>
+                {accounts.map((account) => <option key={account.username} value={account.username}>{account.displayName} ({account.username})</option>)}
               </select>
             )}
           </label>
-
-          {!usersLoading && accounts.length === 0 && !usersError && (
-            <div className="login-field-note">{t('noDashboardUsers')}</div>
-          )}
-          {usersError && (
-            <div className="login-field-note login-field-note--warn">{t('usersLoadError')}</div>
-          )}
-          {!usersLoading && (
-            <button
-              type="button"
-              className="login-picker-toggle"
-              onClick={() => {
-                setUsername('');
-                setManualUsername((current) => !current);
-              }}
-            >
-              {manualUsername ? t('useUserPicker') : t('enterUsernameManually')}
-            </button>
-          )}
+          {!usersLoading && accounts.length === 0 && !usersError && <div className="login-field-note">{t('noDashboardUsers')}</div>}
+          {usersError && <div className="login-field-note login-field-note--warn">{t('usersLoadError')}</div>}
+          {!usersLoading && <button type="button" className="login-picker-toggle" onClick={() => { setUsername(''); setManualUsername((current) => !current); }}>{manualUsername ? t('useUserPicker') : t('enterUsernameManually')}</button>}
 
           <label>
             {t('password')}
@@ -176,7 +122,7 @@ export function LoginPage() {
           <button
             type="submit"
             className="btn btn--primary login-submit"
-            disabled={loading || usersLoading || !username || !password}
+            disabled={loading || usersLoading || !username.trim() || !password}
           >
             {loading ? t('signingIn') : t('signIn')}
           </button>

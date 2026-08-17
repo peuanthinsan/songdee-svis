@@ -19,14 +19,20 @@ type Props = {
   vehicleType: VehicleType;
   zoneStatuses: Record<InspectionZone, ZoneStatus>;
   zoneFailCounts: Record<InspectionZone, number>;
+  zoneItemCounts: Record<InspectionZone, number>;
+  totalItemCount: number;
   activeZone: InspectionZone | null;
   onZonePress: (zone: InspectionZone) => void;
+  onAllZonesPress: () => void;
   zoneLabels: Record<InspectionZone, string>;
+  allZonesLabel: string;
   title: string;
   // Optional external control — if provided, overrides internal toggle state
   diagramVisible?: boolean;
   onToggleDiagram?: () => void;
 };
+
+type DiagramProps = Pick<Props, 'zoneStatuses' | 'activeZone' | 'onZonePress'>;
 
 const ZONE_FILL: Record<ZoneStatus, string> = {
   pending: '#E0E0E0',
@@ -52,7 +58,7 @@ const ZONES: InspectionZone[] = ['front', 'cabin', 'cargo_supplies', 'exterior_t
 // Car / Pickup — Top View (300 x 160)
 // Based on the DHL pickup truck with cargo box from the PowerPoint reference
 // ---------------------------------------------------------------------------
-function CarTopView({ zoneStatuses, activeZone, onZonePress }: Omit<Props, 'vehicleType' | 'zoneLabels' | 'zoneFailCounts' | 'title'>) {
+function CarTopView({ zoneStatuses, activeZone, onZonePress }: DiagramProps) {
   const W = 300;
   const H = 160;
   return (
@@ -191,7 +197,7 @@ function CarTopView({ zoneStatuses, activeZone, onZonePress }: Omit<Props, 'vehi
 // ---------------------------------------------------------------------------
 // E-Van — Top View (300 x 160)
 // ---------------------------------------------------------------------------
-function EVanTopView({ zoneStatuses, activeZone, onZonePress }: Omit<Props, 'vehicleType' | 'zoneLabels' | 'zoneFailCounts' | 'title'>) {
+function EVanTopView({ zoneStatuses, activeZone, onZonePress }: DiagramProps) {
   const W = 300;
   const H = 160;
   return (
@@ -326,7 +332,7 @@ function EVanTopView({ zoneStatuses, activeZone, onZonePress }: Omit<Props, 'veh
 // ---------------------------------------------------------------------------
 // Motorcycle — Top View (200 x 160)
 // ---------------------------------------------------------------------------
-function MotorcycleTopView({ zoneStatuses, activeZone, onZonePress }: Omit<Props, 'vehicleType' | 'zoneLabels' | 'zoneFailCounts' | 'title'>) {
+function MotorcycleTopView({ zoneStatuses, activeZone, onZonePress }: DiagramProps) {
   const W = 200;
   const H = 160;
   return (
@@ -450,9 +456,13 @@ export default function VehicleMap({
   vehicleType,
   zoneStatuses,
   zoneFailCounts,
+  zoneItemCounts,
+  totalItemCount,
   activeZone,
   onZonePress,
+  onAllZonesPress,
   zoneLabels,
+  allZonesLabel,
   title,
   diagramVisible: diagramVisibleProp,
   onToggleDiagram,
@@ -494,6 +504,33 @@ export default function VehicleMap({
 
       {/* Zone buttons row */}
       <View style={styles.zoneRow}>
+        <TouchableOpacity
+          style={[
+            styles.zoneBtn,
+            activeZone === null && styles.zoneBtnActive,
+          ]}
+          onPress={onAllZonesPress}
+          activeOpacity={0.7}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeZone === null }}
+        >
+          <Ionicons
+            name="list-outline"
+            size={14}
+            color={activeZone === null ? colors.accent : colors.textTertiary}
+            style={{ marginBottom: 2 }}
+          />
+          <Text
+            style={[
+              styles.zoneBtnText,
+              activeZone === null && styles.zoneBtnTextActive,
+            ]}
+            numberOfLines={2}
+          >
+            {allZonesLabel}
+          </Text>
+          <Text style={styles.zoneItemCount}>{totalItemCount}</Text>
+        </TouchableOpacity>
         {ZONES.map((zone) => {
           const status = zoneStatuses[zone];
           const active = activeZone === zone;
@@ -509,6 +546,8 @@ export default function VehicleMap({
               ]}
               onPress={() => onZonePress(zone)}
               activeOpacity={0.7}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
             >
               <Ionicons
                 name={
@@ -531,6 +570,7 @@ export default function VehicleMap({
               >
                 {zoneLabels[zone]}
               </Text>
+              <Text style={styles.zoneItemCount}>{zoneItemCounts[zone]}</Text>
               {failCount > 0 && (
                 <View style={styles.zoneBadge}>
                   <Text style={styles.zoneBadgeText}>{failCount}</Text>
@@ -575,8 +615,10 @@ const styles = StyleSheet.create({
   zoneBtn: {
     flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 58,
     paddingVertical: 6,
-    paddingHorizontal: 4,
+    paddingHorizontal: 2,
     borderRadius: borderRadius.sm,
     backgroundColor: colors.inputBackground,
     borderWidth: 1.5,
@@ -601,6 +643,12 @@ const styles = StyleSheet.create({
   zoneBtnTextActive: {
     color: colors.accent,
     fontWeight: '700',
+  },
+  zoneItemCount: {
+    marginTop: 2,
+    fontSize: 9,
+    fontWeight: '700',
+    color: colors.textTertiary,
   },
   zoneBadge: {
     position: 'absolute',

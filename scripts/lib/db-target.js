@@ -71,7 +71,18 @@ function announceTarget(connectionString) {
  * @param {string}  opts.action  human description, e.g. 'seed 359 vehicles'
  * @param {boolean} opts.dryRun  true when the script will not write
  * @param {string[]} [opts.argv] defaults to process.argv
- * @returns {string} the connection string to use
+ * @returns {Readonly<{ url: string, dryRun: boolean }>} the connection string plus the
+ *   mode the caller actually got. A bare string return let a caller silently reuse a
+ *   dry-run connection for a real write, because nothing forced it to look at the flag
+ *   again before connecting — the exact failure class this guard exists to prevent (see
+ *   scripts/wipe-history.js history). This return shape only changes what happens when a
+ *   caller ignores each half of it: ignoring the SHAPE crashes — an old-contract caller
+ *   that passes this object straight to `neon()` gets "Database connection string
+ *   provided to neon() is not a valid URL" instead of a silent write. Ignoring the FLAG
+ *   does not crash — a caller can destructure `{ url }`, skip the `dryRun` check
+ *   entirely, and still write during a dry run; nothing in this function stops that.
+ *   That gap is exactly why tests/db-target-guard.test.mjs exists: it exercises every
+ *   caller's actual dry-run path, not just this function's return shape.
  */
 function requireConfirmedTarget({ action, dryRun = false, argv = process.argv }) {
   const url = resolveDatabaseUrl();
@@ -79,12 +90,12 @@ function requireConfirmedTarget({ action, dryRun = false, argv = process.argv })
 
   if (dryRun) {
     console.log('Mode: DRY RUN — no writes will be performed.\n');
-    return url;
+    return Object.freeze({ url, dryRun: true });
   }
 
   if (argv.includes('--confirm')) {
     console.log(`Mode: WRITE — confirmed. Action: ${action}\n`);
-    return url;
+    return Object.freeze({ url, dryRun: false });
   }
 
   console.error(

@@ -449,12 +449,12 @@ export default function DashboardScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [fleetId, isAdmin, t]);
 
   useFocusEffect(
     useCallback(() => {
       fetchDashboard();
-    }, [])
+    }, [fetchDashboard])
   );
 
   const onRefresh = () => {
@@ -537,11 +537,15 @@ export default function DashboardScreen() {
       });
       if (result.status !== 200) throw new Error(`Export failed (${result.status})`);
       setFilterVisible(false);
-      await Sharing.shareAsync(result.uri, {
-        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        dialogTitle: t('dashboard.saveReport'),
-        UTI: 'com.microsoft.excel.xlsx',
-      });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(result.uri, {
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          dialogTitle: t('dashboard.saveReport'),
+          UTI: 'com.microsoft.excel.xlsx',
+        });
+      } else {
+        Alert.alert(t('dashboard.exportSaved'), result.uri);
+      }
     } catch (err: any) {
       Alert.alert(t('dashboard.exportFailed'), err.message || t('general.error'));
     } finally {

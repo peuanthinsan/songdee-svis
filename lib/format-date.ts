@@ -21,7 +21,7 @@ export function getMondayOfWeekThai(): string {
 }
 
 /**
- * Format a date string to Thai format: DD/MM/YYYY
+ * Format a date string as Gregorian DD/MM/YYYY.
  * Accepts ISO strings, date strings (YYYY-MM-DD), or Date objects
  */
 export function formatDate(dateStr: string | Date): string {
@@ -41,12 +41,11 @@ export function formatDateThai(dateStr: string | Date): string {
   if (isNaN(d.getTime())) return String(dateStr);
   const day = String(d.getDate()).padStart(2, '0');
   const month = String(d.getMonth() + 1).padStart(2, '0');
-  const buddhistYear = d.getFullYear() + 543;
-  return `${day}/${month}/${buddhistYear}`;
+  return `${day}/${month}/${d.getFullYear()}`;
 }
 
 /**
- * Format a datetime string to Thai format with time: DD/MM/BBBB HH:MM
+ * Format a datetime string with Thailand time: DD/MM/YYYY HH:MM
  * Shows time in Thailand timezone (UTC+7)
  */
 export function formatDateTimeThai(dateStr: string | Date): string {
@@ -56,8 +55,7 @@ export function formatDateTimeThai(dateStr: string | Date): string {
   const thai = new Date(d.getTime() + 7 * 60 * 60 * 1000);
   const day = String(thai.getUTCDate()).padStart(2, '0');
   const month = String(thai.getUTCMonth() + 1).padStart(2, '0');
-  const buddhistYear = thai.getUTCFullYear() + 543;
   const hours = String(thai.getUTCHours()).padStart(2, '0');
   const minutes = String(thai.getUTCMinutes()).padStart(2, '0');
-  return `${day}/${month}/${buddhistYear} ${hours}:${minutes}`;
+  return `${day}/${month}/${thai.getUTCFullYear()} ${hours}:${minutes}`;
 }

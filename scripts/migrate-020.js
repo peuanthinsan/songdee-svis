@@ -3,7 +3,7 @@ const path = require('node:path');
 const { neon } = require('@neondatabase/serverless');
 const { requireConfirmedTarget } = require('./lib/db-target');
 
-const databaseUrl = requireConfirmedTarget({
+const { url: databaseUrl } = requireConfirmedTarget({
   action: 'apply migration 020 (persistent login throttling)',
 });
 const migrationPath = path.join(

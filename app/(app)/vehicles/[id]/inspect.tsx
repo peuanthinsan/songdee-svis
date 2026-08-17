@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -68,6 +68,8 @@ export default function InspectScreen() {
   const [readOnlyInspector, setReadOnlyInspector] = useState('');
   const [checklistError, setChecklistError] = useState(false);
   const [diagramVisible, setDiagramVisible] = useState(false);
+  const checklistRequestRef = useRef(0);
+  const checklistScrollRef = useRef<ScrollView>(null);
 
   const failCount = checklistItems.filter(ci => results[ci.id] === 'fail').length;
   const hasFailures = failCount > 0;
@@ -99,12 +101,14 @@ export default function InspectScreen() {
 
   // Per-zone fail counts and statuses
   const zoneFailCounts: Record<InspectionZone, number> = { front: 0, cabin: 0, cargo_supplies: 0, exterior_tires: 0 };
+  const zoneItemCounts: Record<InspectionZone, number> = { front: 0, cabin: 0, cargo_supplies: 0, exterior_tires: 0 };
   const zoneStatuses: Record<InspectionZone, 'pending' | 'pass' | 'fail'> = {
     front: 'pending', cabin: 'pending', cargo_supplies: 'pending', exterior_tires: 'pending',
   };
   for (const zone of ZONE_ORDER) {
     const sections = ZONE_SECTIONS[zone];
     const zoneItems = checklistItems.filter((ci) => sections.includes(ci.section));
+    zoneItemCounts[zone] = zoneItems.length;
     if (zoneItems.length === 0) continue;
     let fails = 0;
     let allChecked = true;
@@ -124,6 +128,12 @@ export default function InspectScreen() {
     exterior_tires: t('zone.exterior_tires' as any),
   };
 
+  const selectZone = useCallback((zone: InspectionZone | null) => {
+    setActiveZone(zone);
+    // A zone behaves like a tab: replace the list and start at its first item.
+    checklistScrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, []);
+
   useEffect(() => {
     loadData();
   }, [id]);
@@ -138,6 +148,7 @@ export default function InspectScreen() {
 
   async function loadChecklist(vehicleType: string) {
     if (!user?.companyId) return;
+    const requestId = ++checklistRequestRef.current;
     try {
       setChecklistError(false);
       const checklistType = vehicleType === 'e_van' ? 'e_van' : vehicleType;
@@ -160,13 +171,11 @@ export default function InspectScreen() {
           items = cached;
         }
       }
+      if (requestId !== checklistRequestRef.current) return;
       setChecklistItems(items);
 
-      // Pick initial active zone = first zone that has items
-      const firstZone = ZONE_ORDER.find((z) =>
-        ZONE_SECTIONS[z].some((s) => items.some((ci: ChecklistItem) => ci.section === s))
-      );
-      setActiveZone(firstZone ?? null);
+      // Start with the complete checklist. Zones are optional filters.
+      setActiveZone(null);
 
       // Default to NO selection so the driver explicitly marks every item.
       setResults({});
@@ -196,20 +205,19 @@ export default function InspectScreen() {
         let logs;
         if (frequency === 'weekly') {
           const monday = getMondayOfWeekThai();
-          logs = await apiFetch(`/api/inspections?vehicleId=${id}&since=${monday}`);
+          logs = await apiFetch(
+            `/api/inspections?vehicleId=${id}&since=${monday}&frequency=${frequency}`
+          );
         } else {
           const today = getTodayThai();
-          logs = await apiFetch(`/api/inspections?vehicleId=${id}&date=${today}`);
+          logs = await apiFetch(
+            `/api/inspections?vehicleId=${id}&date=${today}&frequency=${frequency}`
+          );
         }
+        if (requestId !== checklistRequestRef.current) return;
 
-        // Filter logs to only match current frequency's checklist items
-        const itemNames = new Set(items.map((ci: ChecklistItem) => ci.item_name_en));
-        const matchingLogs = logs.filter((log: any) =>
-          log.results?.some((r: any) => itemNames.has(r.item_name_en))
-        );
-
-        if (matchingLogs.length > 0) {
-          const existing = matchingLogs[0];
+        if (logs.length > 0) {
+          const existing = logs[0];
           if (existing.inspector_id === user?.id || isAdmin) {
             // This driver's own inspection or admin editing — load in edit mode
             setEditMode(true);
@@ -221,8 +229,8 @@ export default function InspectScreen() {
               const savedPhotos: Record<string, string[]> = {};
               const savedNotes: Record<string, string> = {};
               for (const r of existing.results) {
-                const matchingItem = items.find((ci: ChecklistItem) =>
-                  ci.item_name_th === r.item_name_th || ci.item_name_en === r.item_name_en
+                const matchingItem = items.find(
+                  (ci: ChecklistItem) => ci.id === r.checklist_item_id
                 );
                 if (matchingItem) {
                   savedResults[matchingItem.id] = r.result as ItemResult;
@@ -257,11 +265,12 @@ export default function InspectScreen() {
             setReadOnly(true);
             setReadOnlyInspector(existing.inspector_name);
           }
-        } else {
+        } else if (frequency !== 'post_route') {
           // Fresh inspection: defects still open from earlier inspections default to
           // fail until resolved (client request) — the driver flips them to pass once fixed.
           try {
             const carry = await apiFetch(`/api/inspections?vehicleId=${id}&carryover=1`);
+            if (requestId !== checklistRequestRef.current) return;
             const preFilled: Record<string, ItemResult> = {};
             const ids = new Set<string>();
             for (const c of carry?.items ?? []) {
@@ -289,7 +298,7 @@ export default function InspectScreen() {
       }
     } catch (err) {
       console.error('Failed to load checklist:', err);
-      setChecklistError(true);
+      if (requestId === checklistRequestRef.current) setChecklistError(true);
     }
   }
 
@@ -475,7 +484,7 @@ export default function InspectScreen() {
     if (unanswered.length > 0) {
       const firstUnanswered = unanswered[0];
       const unansweredZone = ZONE_ORDER.find((z) => ZONE_SECTIONS[z].includes(firstUnanswered.section));
-      if (unansweredZone) setActiveZone(unansweredZone);
+      if (unansweredZone) selectZone(unansweredZone);
       Alert.alert(
         t('inspection.allItemsRequired'),
         `${locale === 'th' ? firstUnanswered.item_name_th : firstUnanswered.item_name_en}`,
@@ -489,9 +498,9 @@ export default function InspectScreen() {
     );
     if (missingPhotoItems.length > 0) {
       const firstMissing = missingPhotoItems[0];
-      // Jump to the zone containing the first missing item so the user sees it.
+      // Open the tab containing the first missing item so the user sees it.
       const missingZone = ZONE_ORDER.find((z) => ZONE_SECTIONS[z].includes(firstMissing.section));
-      if (missingZone) setActiveZone(missingZone);
+      if (missingZone) selectZone(missingZone);
       Alert.alert(t('inspection.itemPhotoRequired'),
         `${locale === 'th' ? firstMissing.item_name_th : firstMissing.item_name_en}`);
       return;
@@ -579,7 +588,6 @@ export default function InspectScreen() {
           method: 'POST',
           body: formData,
           headers: {
-            'Content-Type': 'multipart/form-data',
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
         });
@@ -791,9 +799,13 @@ export default function InspectScreen() {
           vehicleType={vehicle.vehicle_type}
           zoneStatuses={zoneStatuses}
           zoneFailCounts={zoneFailCounts}
+          zoneItemCounts={zoneItemCounts}
+          totalItemCount={checklistItems.length}
           activeZone={activeZone}
-          onZonePress={setActiveZone}
+          onZonePress={(zone) => selectZone(zone)}
+          onAllZonesPress={() => selectZone(null)}
           zoneLabels={zoneLabels}
+          allZonesLabel={t('inspection.allZones')}
           title={t('inspection.vehicleDiagram')}
           diagramVisible={diagramVisible}
           onToggleDiagram={() => setDiagramVisible(v => !v)}
@@ -801,7 +813,19 @@ export default function InspectScreen() {
       )}
 
       {/* Checklist */}
-      <ScrollView style={styles.scrollArea} contentContainerStyle={styles.scrollContent}>
+      <ScrollView ref={checklistScrollRef} style={styles.scrollArea} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.zoneContentHeader}>
+          <View>
+            <Text style={styles.zoneContentEyebrow}>{t('inspection.showingItems')}</Text>
+            <Text style={styles.zoneContentTitle}>
+              {activeZone ? zoneLabels[activeZone] : t('inspection.allZones')}
+            </Text>
+          </View>
+          <View style={styles.zoneContentCount}>
+            <Text style={styles.zoneContentCountNumber}>{visibleItems.length}</Text>
+            <Text style={styles.zoneContentCountLabel}>{t('inspection.items')}</Text>
+          </View>
+        </View>
         {carryoverItems.size > 0 && (
           <View style={styles.carryoverBanner}>
             <Ionicons name="alert-circle" size={18} color={colors.accent} style={{ marginRight: 6 }} />
@@ -819,6 +843,12 @@ export default function InspectScreen() {
             >
               <Text style={{ fontWeight: '600', color: colors.onPrimary }}>{t('general.retry')}</Text>
             </TouchableOpacity>
+          </View>
+        )}
+        {activeZone && visibleItems.length === 0 && (
+          <View style={styles.emptyZone}>
+            <Ionicons name="list-outline" size={28} color={colors.textTertiary} />
+            <Text style={styles.emptyZoneText}>{t('inspection.noItemsInZone')}</Text>
           </View>
         )}
         {visibleItems.map((item, itemIndex) => {
@@ -1019,14 +1049,6 @@ export default function InspectScreen() {
                 ))}
               </View>
             )}
-          </View>
-        )}
-
-        {/* All pass */}
-        {allItemsAnswered && !hasFailures && checklistItems.length > 0 && (
-          <View style={styles.allPassRow}>
-            <Ionicons name="checkmark-circle" size={20} color={colors.statusPass} style={{ marginRight: spacing.sm }} />
-            <Text style={styles.allPassText}>{t('inspection.allPass')}</Text>
           </View>
         )}
 
@@ -1600,6 +1622,65 @@ const styles = StyleSheet.create({
   // Checklist
   scrollArea: { flex: 1 },
   scrollContent: { paddingBottom: spacing.md },
+  zoneContentHeader: {
+    minHeight: 58,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: '#F7F9FA',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  zoneContentEyebrow: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: colors.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.7,
+  },
+  zoneContentTitle: {
+    marginTop: 2,
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.textPrimary,
+  },
+  zoneContentCount: {
+    minWidth: 48,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  zoneContentCountNumber: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: colors.accent,
+  },
+  zoneContentCountLabel: {
+    fontSize: 8,
+    fontWeight: '700',
+    color: colors.textTertiary,
+  },
+  emptyZone: {
+    margin: spacing.md,
+    padding: spacing.xl,
+    alignItems: 'center',
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  emptyZoneText: {
+    marginTop: spacing.sm,
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
   checkCard: {
     marginHorizontal: spacing.md,
     marginTop: 7,
@@ -1855,26 +1936,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-
-  // All pass
-  allPassRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: spacing.md,
-    marginTop: spacing.sm,
-    marginHorizontal: spacing.md,
-    backgroundColor: statusColors.pass.bg,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.statusPass + '30',
-  },
-  allPassText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.statusPass,
   },
 
   // Submit bar

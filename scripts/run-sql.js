@@ -1,15 +1,21 @@
 const { neon } = require('@neondatabase/serverless');
 const fs = require('fs');
-require('dotenv').config({ path: '.env.local' });
+const { requireConfirmedTarget } = require('./lib/db-target');
 
-async function runStatements(sql, filePath) {
+const dryRun = process.argv.includes('--dry-run');
+const FILES = ['sql/001-schema.sql', 'sql/002-rls.sql', 'sql/003-seed.sql'];
+
+function parseStatements(filePath) {
   const content = fs.readFileSync(filePath, 'utf8');
   // Split on semicolons, filter empty statements
-  const statements = content
+  return content
     .split(';')
     .map(s => s.trim())
     .filter(s => s.length > 0 && !s.startsWith('--'));
+}
 
+async function runStatements(sql, filePath) {
+  const statements = parseStatements(filePath);
   for (const stmt of statements) {
     try {
       await sql.query(stmt);
@@ -23,11 +29,25 @@ async function runStatements(sql, filePath) {
 }
 
 async function run() {
-  const sql = neon(process.env.DATABASE_URL);
+  const { url } = requireConfirmedTarget({
+    action: 'apply sql/001-schema.sql, sql/002-rls.sql and sql/003-seed.sql',
+    dryRun,
+  });
 
-  await runStatements(sql, 'sql/001-schema.sql');
-  await runStatements(sql, 'sql/002-rls.sql');
-  await runStatements(sql, 'sql/003-seed.sql');
+  if (dryRun) {
+    console.log('Dry run: no writes will be performed.');
+    for (const filePath of FILES) {
+      const statements = parseStatements(filePath);
+      console.log(`  ${filePath}: ${statements.length} statements`);
+    }
+    return;
+  }
+
+  const sql = neon(url);
+
+  for (const filePath of FILES) {
+    await runStatements(sql, filePath);
+  }
 
   // Verify
   const vehicles = await sql`SELECT COUNT(*) as count FROM vehicle_master`;

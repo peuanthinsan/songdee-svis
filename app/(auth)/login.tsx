@@ -17,17 +17,7 @@ import { Image } from 'expo-image';
 import { colors, spacing, borderRadius, shadows } from '../../constants/theme';
 import { useI18n } from '../../lib/i18n-context';
 import { API_BASE } from '../../lib/api';
-import type { Company } from '../../lib/types';
-
-// No hardcoded fallbacks — all names loaded from database via API
-const DRIVERS_FALLBACK: string[] = [];
-const STAFF_FALLBACK: string[] = [];
-
-function nameToUsername(name: string): string {
-  return name.toLowerCase().replace(/\s+/g, '_');
-}
-
-type LoginMode = 'driver' | 'staff';
+import type { Company, LoginAccount } from '../../lib/types';
 
 const DEFAULT_COMPANIES: Company[] = [{
   slug: 'dhl',
@@ -37,22 +27,29 @@ const DEFAULT_COMPANIES: Company[] = [{
   accentColor: '#D40511',
 }];
 
+function normalizeUsername(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, '_');
+}
+
+type LoginMode = 'driver' | 'staff';
+
 export default function LoginScreen() {
   const { signIn } = useAuth();
   const { t } = useI18n();
   const [mode, setMode] = useState<LoginMode>('driver');
-  const [selectedName, setSelectedName] = useState('');
-  const [selectedStaffName, setSelectedStaffName] = useState('');
+  const [selectedDriver, setSelectedDriver] = useState<LoginAccount | null>(null);
+  const [selectedStaff, setSelectedStaff] = useState<LoginAccount | null>(null);
+  const [manualEntry, setManualEntry] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [showCompanyPicker, setShowCompanyPicker] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [search, setSearch] = useState('');
-  const [driverNames, setDriverNames] = useState<string[]>(DRIVERS_FALLBACK);
-  const [staffNames, setStaffNames] = useState<string[]>(STAFF_FALLBACK);
+  const [driverAccounts, setDriverAccounts] = useState<LoginAccount[]>([]);
+  const [staffAccounts, setStaffAccounts] = useState<LoginAccount[]>([]);
+  const [showPassword, setShowPassword] = useState(false);
   const [companies, setCompanies] = useState<Company[]>(DEFAULT_COMPANIES);
   const [selectedCompanySlug, setSelectedCompanySlug] = useState('dhl');
 
@@ -69,29 +66,55 @@ export default function LoginScreen() {
   }, []);
 
   useEffect(() => {
-    setSelectedName('');
-    setSelectedStaffName('');
-    setDriverNames(DRIVERS_FALLBACK);
-    setStaffNames(STAFF_FALLBACK);
+    setSelectedDriver(null);
+    setSelectedStaff(null);
+    setUsername('');
+    setDriverAccounts([]);
+    setStaffAccounts([]);
     fetch(`${API_BASE}/api/auth/users-list?company=${encodeURIComponent(selectedCompanySlug)}`)
-      .then(r => r.json())
-      .then(data => {
-        if (data.drivers?.length) setDriverNames(data.drivers);
-        if (data.staff?.length) setStaffNames(data.staff);
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.driverAccounts?.length) {
+          setDriverAccounts(data.driverAccounts);
+        } else if (data.drivers?.length) {
+          setDriverAccounts(data.drivers.map((name: string) => ({ username: normalizeUsername(name), displayName: name, role: 'driver' as const })));
+        }
+        if (data.staffAccounts?.length) {
+          setStaffAccounts(data.staffAccounts);
+        } else if (data.staff?.length) {
+          setStaffAccounts(data.staff.map((name: string) => ({ username: normalizeUsername(name), displayName: name, role: 'supervisor' as const })));
+        }
       })
       .catch(() => {});
   }, [selectedCompanySlug]);
 
-  const nameList = mode === 'driver' ? driverNames : staffNames;
-  const currentName = mode === 'driver' ? selectedName : selectedStaffName;
-  const filteredNames = nameList.filter((name) =>
-    name.toLowerCase().includes(search.toLowerCase())
+  const accountList = mode === 'driver' ? driverAccounts : staffAccounts;
+  const currentAccount = mode === 'driver' ? selectedDriver : selectedStaff;
+  const filteredAccounts = accountList.filter((account) =>
+    account.displayName.toLowerCase().includes(search.toLowerCase()) ||
+    account.username.toLowerCase().includes(search.toLowerCase())
   );
+  const identifier = manualEntry ? normalizeUsername(username) : currentAccount?.username ?? '';
 
-  const identifier = mode === 'driver'
-    ? nameToUsername(selectedName)
-    : nameToUsername(selectedStaffName);
   const canSubmit = !loading && password.length > 0 && identifier.length > 0;
+
+  function closeAccountPicker() {
+    setShowPicker(false);
+    setSearch('');
+  }
+
+  function setLoginMode(nextMode: LoginMode) {
+    setMode(nextMode);
+    setManualEntry(false);
+    setUsername('');
+    setError('');
+  }
+
+  function toggleManualEntry() {
+    setManualEntry((current) => !current);
+    setUsername('');
+    setError('');
+  }
 
   async function handleSignIn() {
     if (!canSubmit) return;
@@ -150,46 +173,41 @@ export default function LoginScreen() {
             <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
           </TouchableOpacity>
 
-          {/* Mode toggle with underline */}
-          <View style={styles.modeToggle}>
-            <TouchableOpacity
-              style={[styles.modeBtn, mode === 'driver' && styles.modeBtnActive]}
-              onPress={() => { setMode('driver'); setError(''); }}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.modeBtnText, mode === 'driver' && styles.modeBtnTextActive]}>
-                {t('login.driverMode')}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modeBtn, mode === 'staff' && styles.modeBtnActive]}
-              onPress={() => { setMode('staff'); setError(''); }}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.modeBtnText, mode === 'staff' && styles.modeBtnTextActive]}>
-                {t('login.staffMode')}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
           <View style={styles.form}>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="person-outline" size={20} color={colors.textTertiary} style={styles.inputIcon} />
-              <TouchableOpacity
-                style={styles.pickerInner}
-                onPress={() => setShowPicker(true)}
-              >
-                <Text
-                  style={[
-                    styles.pickerText,
-                    !currentName && styles.pickerPlaceholder,
-                  ]}
-                >
-                  {currentName || (mode === 'driver' ? t('login.selectDriver') : t('login.selectStaff'))}
-                </Text>
-                <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
+            <View style={styles.modeToggle}>
+              <TouchableOpacity style={[styles.modeBtn, mode === 'driver' && styles.modeBtnActive]} onPress={() => setLoginMode('driver')}>
+                <Text style={[styles.modeBtnText, mode === 'driver' && styles.modeBtnTextActive]}>{t('login.driverMode')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modeBtn, mode === 'staff' && styles.modeBtnActive]} onPress={() => setLoginMode('staff')}>
+                <Text style={[styles.modeBtnText, mode === 'staff' && styles.modeBtnTextActive]}>{t('login.staffMode')}</Text>
               </TouchableOpacity>
             </View>
+            <View style={styles.inputWrapper}>
+              <Ionicons name="person-outline" size={20} color={colors.textTertiary} style={styles.inputIcon} />
+              {manualEntry ? (
+                <TextInput
+                  style={styles.input}
+                  placeholder={t('login.usernameHint')}
+                  placeholderTextColor={colors.textTertiary}
+                  value={username}
+                  onChangeText={setUsername}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  textContentType="username"
+                />
+              ) : (
+                <TouchableOpacity style={styles.pickerInner} onPress={() => setShowPicker(true)}>
+                  <Text style={[styles.pickerText, !currentAccount && styles.pickerPlaceholder]}>{currentAccount?.displayName || (mode === 'driver' ? t('login.selectDriver') : t('login.selectStaff'))}</Text>
+                  <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
+              )}
+            </View>
+            <TouchableOpacity
+              style={styles.manualToggle}
+              onPress={toggleManualEntry}
+            >
+              <Text style={styles.manualToggleText}>{manualEntry ? t('login.chooseFromList') : t('login.enterUsernameManually')}</Text>
+            </TouchableOpacity>
 
             <View style={styles.inputWrapper}>
               <Ionicons name="lock-closed-outline" size={20} color={colors.textTertiary} style={styles.inputIcon} />
@@ -243,60 +261,22 @@ export default function LoginScreen() {
         </View>
       </View>
 
-      <Modal visible={showPicker} animationType="slide" transparent statusBarTranslucent>
+      <Modal visible={showPicker} animationType="fade" transparent statusBarTranslucent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={styles.userModal}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{mode === 'driver' ? t('login.selectDriver') : t('login.selectStaff')}</Text>
-              <TouchableOpacity
-                onPress={() => setShowPicker(false)}
-                style={styles.modalCloseBtn}
-              >
-                <Ionicons name="close" size={24} color={colors.textSecondary} />
-              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setShowPicker(false)} style={styles.modalCloseBtn}><Ionicons name="close" size={24} color={colors.textSecondary} /></TouchableOpacity>
             </View>
-            <View style={styles.searchWrapper}>
-              <Ionicons name="search" size={18} color={colors.textTertiary} style={{ marginRight: 8 }} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder={t('login.searchDriver')}
-                placeholderTextColor={colors.textTertiary}
-                value={search}
-                onChangeText={setSearch}
-                autoCapitalize="none"
-                autoFocus
-              />
-            </View>
+            <TextInput style={styles.searchInput} placeholder={t('login.searchDriver')} value={search} onChangeText={setSearch} />
             <FlatList
-              data={filteredNames}
-              keyExtractor={(item) => item}
+              data={filteredAccounts}
+              keyExtractor={(item) => item.username}
+              keyboardShouldPersistTaps="handled"
               renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.driverItem,
-                    item === currentName && styles.driverItemSelected,
-                  ]}
-                  onPress={() => {
-                    if (mode === 'driver') {
-                      setSelectedName(item);
-                    } else {
-                      setSelectedStaffName(item);
-                    }
-                    setShowPicker(false);
-                    setSearch('');
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.driverName,
-                      item === currentName && styles.driverNameSelected,
-                    ]}
-                  >
-                    {item}
-                  </Text>
-                  {item === currentName && (
-                    <Ionicons name="checkmark" size={20} color={colors.accent} />
-                  )}
+                <TouchableOpacity style={[styles.userOption, item.username === currentAccount?.username && styles.userOptionSelected]} onPress={() => { if (mode === 'driver') setSelectedDriver(item); else setSelectedStaff(item); closeAccountPicker(); }}>
+                  <Text style={styles.userOptionText}>{item.displayName}</Text>
+                  {item.username === currentAccount?.username && <Ionicons name="checkmark" size={20} color={colors.accent} />}
                 </TouchableOpacity>
               )}
             />
@@ -427,35 +407,24 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 2,
   },
-  // Mode toggle with underline
+  form: {
+    gap: 10,
+  },
   modeToggle: {
     flexDirection: 'row',
-    marginBottom: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   modeBtn: {
     flex: 1,
-    paddingVertical: 10,
     alignItems: 'center',
-    marginBottom: -1,
-  },
-  modeBtnActive: {
+    paddingVertical: 9,
     borderBottomWidth: 2,
-    borderBottomColor: colors.accent,
+    borderBottomColor: 'transparent',
   },
-  modeBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  modeBtnTextActive: {
-    color: colors.accent,
-    fontWeight: '700',
-  },
-  form: {
-    gap: 10,
-  },
+  modeBtnActive: { borderBottomColor: colors.accent },
+  modeBtnText: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
+  modeBtnTextActive: { color: colors.accent },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -468,21 +437,6 @@ const styles = StyleSheet.create({
   inputIcon: {
     marginRight: spacing.sm,
   },
-  pickerInner: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-  },
-  pickerText: {
-    fontSize: 15,
-    color: colors.textPrimary,
-    flex: 1,
-  },
-  pickerPlaceholder: {
-    color: colors.textTertiary,
-  },
   input: {
     flex: 1,
     fontSize: 15,
@@ -494,6 +448,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
+  pickerInner: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
+  pickerText: { flex: 1, color: colors.textPrimary, fontSize: 15 },
+  pickerPlaceholder: { color: colors.textTertiary },
   error: {
     color: colors.statusFail,
     fontSize: 14,
@@ -519,19 +476,36 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
-  modalContent: {
-    backgroundColor: colors.white,
-    borderTopLeftRadius: borderRadius.lg,
-    borderTopRightRadius: borderRadius.lg,
-    maxHeight: '75%',
-    paddingBottom: spacing.xl,
-  },
   companyModal: {
     backgroundColor: colors.white,
     borderRadius: borderRadius.lg,
     margin: spacing.lg,
     overflow: 'hidden',
   },
+  userModal: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    margin: spacing.lg,
+    maxHeight: '80%',
+    overflow: 'hidden',
+  },
+  searchInput: {
+    margin: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.sm,
+    color: colors.textPrimary,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  userOption: { borderBottomWidth: 1, borderBottomColor: colors.border, padding: spacing.md },
+  userOptionSelected: { backgroundColor: colors.accent + '12', flexDirection: 'row', justifyContent: 'space-between' },
+  userOptionText: { color: colors.textPrimary, fontSize: 15 },
+  emptyUserText: { color: colors.textTertiary, padding: spacing.lg, textAlign: 'center' },
+  manualUserButton: { borderTopWidth: 1, borderTopColor: colors.border, padding: spacing.md },
+  manualUserText: { color: colors.accent, fontWeight: '700', textAlign: 'center' },
+  manualToggleText: { color: colors.accent, fontSize: 13, fontWeight: '700', paddingVertical: 4, textAlign: 'center' },
+  manualToggle: { alignItems: 'center', paddingVertical: 2 },
   companyOption: {
     alignItems: 'center',
     borderBottomColor: colors.border,
@@ -559,39 +533,6 @@ const styles = StyleSheet.create({
   },
   modalCloseBtn: {
     padding: spacing.xs,
-  },
-  searchWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    margin: spacing.md,
-    padding: 12,
-    backgroundColor: colors.inputBackground,
-    borderRadius: borderRadius.sm,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: colors.textPrimary,
-  },
-  driverItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  driverItemSelected: {
-    backgroundColor: colors.accent + '14',
-  },
-  driverName: {
-    flex: 1,
-    fontSize: 15,
-    color: colors.textPrimary,
-  },
-  driverNameSelected: {
-    fontWeight: '700',
-    color: colors.accent,
   },
   poweredBy: {
     flexDirection: 'row',

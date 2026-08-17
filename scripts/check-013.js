@@ -1,7 +1,9 @@
 const { neon } = require('@neondatabase/serverless');
-require('dotenv').config({ path: '.env.local' });
+const { resolveDatabaseUrl, announceTarget } = require('./lib/db-target');
 (async () => {
-  const sql = neon(process.env.DATABASE_URL);
+  const url = resolveDatabaseUrl();
+  announceTarget(url);
+  const sql = neon(url);
   const cols = await sql`SELECT column_name, data_type FROM information_schema.columns WHERE table_name='inspection_logs' AND column_name IN ('mileage','odometer_photo_url')`;
   console.log('inspection_logs cols:', cols);
   const checks = await sql`SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint WHERE conname='checklist_items_frequency_check'`;

@@ -162,7 +162,7 @@ export default function AdminIssuesScreen() {
             try {
               await apiFetch(`/api/issues/${issue.id}`, {
                 method: 'PATCH',
-                body: JSON.stringify({ status: 'completed' }),
+                body: JSON.stringify({ status: 'completed', forceClose: true }),
               });
               setSelectedIssue(null);
               setIssues([]);
@@ -307,7 +307,7 @@ export default function AdminIssuesScreen() {
             <Ionicons name="download-outline" size={16} color={colors.white} />
           )}
           <Text style={styles.exportBtnText}>
-            {exporting ? 'Exporting…' : 'Export'}
+            {exporting ? t('issues.exporting') : t('issues.export')}
           </Text>
         </TouchableOpacity>
       </View>

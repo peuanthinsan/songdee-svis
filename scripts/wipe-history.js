@@ -18,7 +18,11 @@ const { del } = require('@vercel/blob');
 const { requireConfirmedTarget } = require('./lib/db-target');
 
 const CONFIRMED = process.argv.includes('--yes');
-requireConfirmedTarget({
+// Bind the guard's returned url so main() connects to the exact host it just
+// announced, instead of re-reading process.env.DATABASE_URL independently —
+// two reads of "the same" value is how an announced target and a connected
+// target silently drift apart.
+const { url: databaseUrl } = requireConfirmedTarget({
   action: 'DELETE all inspection history, issue reports, audit log and blob photos',
   dryRun: !CONFIRMED,
 });
@@ -45,10 +49,9 @@ function collectUrls(rows, fields) {
 }
 
 async function main() {
-  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL missing');
   if (!process.env.BLOB_READ_WRITE_TOKEN) throw new Error('BLOB_READ_WRITE_TOKEN missing');
 
-  const sql = neon(process.env.DATABASE_URL);
+  const sql = neon(databaseUrl);
 
   // 1. Gather all blob URLs referenced in the soon-to-be-deleted rows.
   const insp = await sql`SELECT photo_urls, odometer_photo_url FROM inspection_logs`;

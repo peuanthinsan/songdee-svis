@@ -47,13 +47,15 @@ export default function AdminScreen() {
   const fetchData = useCallback(async () => {
     try {
       setError(null);
-      const [vehicleData, stats, issueData] = await Promise.all([
+      const [vehicleData, fleetDataResult, stats, issueData] = await Promise.all([
         apiFetch('/api/vehicles'),
+        apiFetch('/api/admin/fleets').catch(() => null),
         apiFetch('/api/admin/user-stats').catch(() => null),
         apiFetch('/api/issues?status=open&limit=200').catch(() => null),
       ]);
 
       const vehicleList = vehicleData.vehicles || vehicleData;
+      const fleetData = Array.isArray(fleetDataResult) ? fleetDataResult : null;
       const fleetMap: Record<string, number> = {};
       for (const v of vehicleList) {
         fleetMap[v.fleet_id] = (fleetMap[v.fleet_id] || 0) + 1;
@@ -62,7 +64,7 @@ export default function AdminScreen() {
         .map(([fleet_id, vehicle_count]) => ({ fleet_id, vehicle_count }))
         .sort((a, b) => a.fleet_id.localeCompare(b.fleet_id));
 
-      setFleets(summaries);
+      setFleets(fleetData ? fleetData.map((fleet: any) => ({ fleet_id: fleet.fleet_id, vehicle_count: Number(fleet.vehicle_count) || 0 })) : summaries);
       setUserStats(stats);
       if (issueData && Array.isArray(issueData.issues)) {
         setOpenIssueCount(issueData.issues.length);
