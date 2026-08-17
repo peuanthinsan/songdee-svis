@@ -87,9 +87,13 @@ function selectCompanySlug(opts = {}) {
   const hasBareFlag = companyTokens.some((token) => token === '--company');
   const valueTokens = companyTokens.filter((token) => token.startsWith(COMPANY_FLAG_PREFIX));
 
-  // A bare --company alongside a valued token cannot fall through to an
-  // ambient tenant, but it is still ambiguous. Report that exact condition
-  // and list every valued token so the operator can fix the command once.
+  // A bare --company alongside one or more --company=<value> tokens is not
+  // the "silently falls back to the ambient tenant" case M1 warns about — a
+  // value token is present, so no fallback would occur. It is still
+  // ambiguous (which token wins?), so still refuse, but with a message that
+  // names the condition that actually fired. This check must run before the
+  // bare-alone check and the repeated-value check below, so this exact
+  // combination is never misreported as either of those.
   if (hasBareFlag && valueTokens.length > 0) {
     const rawValues = valueTokens.map((token) => token.slice(COMPANY_FLAG_PREFIX.length));
     const quotedList = rawValues.map((value) => JSON.stringify(value)).join(', ');
@@ -113,6 +117,10 @@ function selectCompanySlug(opts = {}) {
     const trimmedValues = rawValues.map((value) => value.trim());
     const allSameValue = trimmedValues.every((value) => value === trimmedValues[0]);
 
+    // Identical repeated values are not ambiguous — there is only one
+    // candidate tenant — but a repeated flag still means a hand-edited
+    // command line, so keep refusing (conservative is right) while naming
+    // the condition that actually fired instead of claiming ambiguity.
     if (allSameValue) {
       const quotedRawValues = rawValues.map((value) => JSON.stringify(value)).join(', ');
       throw new Error(
