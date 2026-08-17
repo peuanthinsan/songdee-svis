@@ -34,7 +34,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         LEFT JOIN inspection_logs il ON il.id = ir.inspection_id
         WHERE ir.company_id = ${user.companyId} AND ir.status = ${s} AND vm.fleet_id = ${f}
           AND (vm.plate_number ILIKE ${q} OR vm.fleet_id ILIKE ${q})
-        ORDER BY ir.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
+        ORDER BY ir.updated_at DESC NULLS LAST, ir.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
     } else if (s && f) {
       issues = await sql`
         SELECT ir.*, vm.plate_number, vm.vehicle_type, vm.fleet_id as vehicle_fleet,
@@ -43,7 +43,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         JOIN vehicle_master vm ON vm.id = ir.vehicle_id
         LEFT JOIN inspection_logs il ON il.id = ir.inspection_id
         WHERE ir.company_id = ${user.companyId} AND ir.status = ${s} AND vm.fleet_id = ${f}
-        ORDER BY ir.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
+        ORDER BY ir.updated_at DESC NULLS LAST, ir.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
     } else if (s && q) {
       issues = await sql`
         SELECT ir.*, vm.plate_number, vm.vehicle_type, vm.fleet_id as vehicle_fleet,
@@ -52,7 +52,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         JOIN vehicle_master vm ON vm.id = ir.vehicle_id
         LEFT JOIN inspection_logs il ON il.id = ir.inspection_id
         WHERE ir.company_id = ${user.companyId} AND ir.status = ${s} AND (vm.plate_number ILIKE ${q} OR vm.fleet_id ILIKE ${q})
-        ORDER BY ir.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
+        ORDER BY ir.updated_at DESC NULLS LAST, ir.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
     } else if (f && q) {
       issues = await sql`
         SELECT ir.*, vm.plate_number, vm.vehicle_type, vm.fleet_id as vehicle_fleet,
@@ -61,7 +61,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         JOIN vehicle_master vm ON vm.id = ir.vehicle_id
         LEFT JOIN inspection_logs il ON il.id = ir.inspection_id
         WHERE ir.company_id = ${user.companyId} AND vm.fleet_id = ${f} AND (vm.plate_number ILIKE ${q} OR vm.fleet_id ILIKE ${q})
-        ORDER BY ir.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
+        ORDER BY ir.updated_at DESC NULLS LAST, ir.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
     } else if (s) {
       issues = await sql`
         SELECT ir.*, vm.plate_number, vm.vehicle_type, vm.fleet_id as vehicle_fleet,
@@ -70,7 +70,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         JOIN vehicle_master vm ON vm.id = ir.vehicle_id
         LEFT JOIN inspection_logs il ON il.id = ir.inspection_id
         WHERE ir.company_id = ${user.companyId} AND ir.status = ${s}
-        ORDER BY ir.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
+        ORDER BY ir.updated_at DESC NULLS LAST, ir.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
     } else if (f) {
       issues = await sql`
         SELECT ir.*, vm.plate_number, vm.vehicle_type, vm.fleet_id as vehicle_fleet,
@@ -79,7 +79,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         JOIN vehicle_master vm ON vm.id = ir.vehicle_id
         LEFT JOIN inspection_logs il ON il.id = ir.inspection_id
         WHERE ir.company_id = ${user.companyId} AND vm.fleet_id = ${f}
-        ORDER BY ir.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
+        ORDER BY ir.updated_at DESC NULLS LAST, ir.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
     } else if (q) {
       issues = await sql`
         SELECT ir.*, vm.plate_number, vm.vehicle_type, vm.fleet_id as vehicle_fleet,
@@ -89,7 +89,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         LEFT JOIN inspection_logs il ON il.id = ir.inspection_id
         WHERE ir.company_id = ${user.companyId}
           AND (vm.plate_number ILIKE ${q} OR vm.fleet_id ILIKE ${q})
-        ORDER BY ir.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
+        ORDER BY ir.updated_at DESC NULLS LAST, ir.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
     } else {
       issues = await sql`
         SELECT ir.*, vm.plate_number, vm.vehicle_type, vm.fleet_id as vehicle_fleet,
@@ -98,7 +98,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         JOIN vehicle_master vm ON vm.id = ir.vehicle_id
         LEFT JOIN inspection_logs il ON il.id = ir.inspection_id
         WHERE ir.company_id = ${user.companyId}
-        ORDER BY ir.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
+        ORDER BY ir.updated_at DESC NULLS LAST, ir.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
     }
     res.status(200).json({ issues, limit, offset });
   } catch (error: any) {
