@@ -6,19 +6,19 @@ function parseDateOnly(value: string): { day: number; month: number; year: numbe
   return { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]) };
 }
 
-/** Format a calendar date as DD/MM/YYYY using the app's Thai display convention. */
+/** Format a calendar date as DD/MM/YYYY in the Gregorian calendar. */
 export function formatDateThai(value: string | Date | null | undefined): string {
   if (value === null || value === undefined || value === '') return '—';
   if (typeof value === 'string') {
     const dateOnly = parseDateOnly(value);
     if (dateOnly) {
-      return `${String(dateOnly.day).padStart(2, '0')}/${String(dateOnly.month).padStart(2, '0')}/${dateOnly.year + 543}`;
+      return `${String(dateOnly.day).padStart(2, '0')}/${String(dateOnly.month).padStart(2, '0')}/${dateOnly.year}`;
     }
   }
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
   const thai = new Date(date.getTime() + THAI_OFFSET_MS);
-  return `${String(thai.getUTCDate()).padStart(2, '0')}/${String(thai.getUTCMonth() + 1).padStart(2, '0')}/${thai.getUTCFullYear() + 543}`;
+  return `${String(thai.getUTCDate()).padStart(2, '0')}/${String(thai.getUTCMonth() + 1).padStart(2, '0')}/${thai.getUTCFullYear()}`;
 }
 
 /** Format a timestamp as DD/MM/YYYY HH:mm in Thailand time. */
