@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { IssueRow, fetchIssues, updateIssueStatus } from '../../api';
 import { t } from '../../i18n';
+import { formatDateThai, formatDateTimeThai } from '../../lib/format-date';
 
 const STATUSES = ['open', 'in_progress', 'completed'];
 
@@ -20,10 +21,20 @@ export function IssuesMgmtTab() {
   useEffect(() => load(filter), [filter]);
 
   async function changeStatus(issue: IssueRow, newStatus: string) {
+    // The dashboard does not have a completion-photo upload flow yet. Keep the
+    // client from sending an inevitably invalid request (and from showing a
+    // misleading status transition if an older API is deployed).
+    if (newStatus === 'completed') {
+      alert('Completion photo required to close an issue');
+      return;
+    }
+
     setUpdating(issue.id);
     try {
       await updateIssueStatus(issue.id, newStatus);
-      setIssues((prev) => prev.map((i) => i.id === issue.id ? { ...i, status: newStatus } : i));
+      setIssues((prev) => filter === 'all'
+        ? prev.map((i) => i.id === issue.id ? { ...i, status: newStatus } : i)
+        : prev.filter((i) => i.id !== issue.id));
     } catch (e: any) {
       alert(e.message || t('error'));
     } finally {
@@ -63,7 +74,7 @@ export function IssuesMgmtTab() {
                   <td><strong>{issue.plate_number}</strong></td>
                   <td className="muted">{issue.fleet_id || issue.vehicle_fleet || '—'}</td>
                   <td className="muted">{issue.inspector_name || '—'}</td>
-                  <td className="muted">{issue.inspection_date ? issue.inspection_date.slice(0, 10) : issue.created_at.slice(0, 10)}</td>
+                  <td className="muted">{issue.inspection_date ? formatDateThai(issue.inspection_date) : formatDateTimeThai(issue.created_at)}</td>
                   <td><span className={`badge badge--${issue.status}`}>{statusLabel[issue.status]}</span></td>
                   <td>
                     {next && (

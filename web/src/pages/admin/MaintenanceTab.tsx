@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchMaintenance, saveMaintenance, MaintenanceVehicle } from '../../api';
 import { t } from '../../i18n';
+import { formatDateThai } from '../../lib/format-date';
 
 type FormState = {
   region: 'metro' | 'provincial';
@@ -149,11 +150,11 @@ export function MaintenanceTab() {
                       </>
                     ) : (
                       <>
-                        <td className="muted">{v.lastServiceDate ?? '—'}</td>
+                        <td className="muted">{formatDateThai(v.lastServiceDate)}</td>
                         <td className="muted">{v.lastServiceMileage === null ? '—' : v.lastServiceMileage.toLocaleString()}</td>
-                        <td className="muted">{v.lastTireChangeDate ?? '—'}</td>
+                        <td className="muted">{formatDateThai(v.lastTireChangeDate)}</td>
                         <td className="muted">{v.lastTireChangeMileage === null ? '—' : v.lastTireChangeMileage.toLocaleString()}</td>
-                        <td className="muted">{v.lastBatteryChangeDate ?? '—'}</td>
+                        <td className="muted">{formatDateThai(v.lastBatteryChangeDate)}</td>
                       </>
                     )}
                     <td className="maintenance-table__actions" style={{ whiteSpace: 'nowrap' }}>

@@ -19,6 +19,7 @@ import {
 import { useAuth } from '../AuthContext';
 import { DonutChart, type DonutSegment } from '../components/DonutChart';
 import { t } from '../i18n';
+import { formatDateThai } from '../lib/format-date';
 
 const GPS_COLOR: Record<string, string> = {
   running: '#22c55e',
@@ -161,7 +162,7 @@ function maintDetail(info: MaintenanceCategory): string {
     parts.push(t('maintenanceKmLeft', { km: info.kmRemaining.toLocaleString() }));
   }
   if (info.dueDate) {
-    parts.push(t('maintenanceDueOn', { date: info.dueDate }));
+    parts.push(t('maintenanceDueOn', { date: formatDateThai(info.dueDate) }));
   }
   return parts.join(' · ');
 }
@@ -417,7 +418,7 @@ export function DashboardPage() {
       <div className="page-header dashboard-header">
         <div>
           <h1>{t('greeting', { name: user.firstName })}</h1>
-          <p className="muted">{t('today')} {data.date}</p>
+          <p className="muted">{t('today')} {formatDateThai(data.date)}</p>
         </div>
         <div className="header-actions">
           {isAdmin && (

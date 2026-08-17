@@ -4,6 +4,7 @@ import { fetchHistory, fetchInspectionDetail, type HistoryData, type InspectionD
 import { useAuth } from '../AuthContext';
 import { t } from '../i18n';
 import { PhotoGrid } from '../components/PhotoGrid';
+import { formatDateThai } from '../lib/format-date';
 
 type Range = 'today' | 'week' | 'month';
 
@@ -55,7 +56,7 @@ function InspectionModal({ inspection, onClose }: { inspection: InspectionDetail
           <div>
             <h2 style={{ margin:0, fontSize:20 }}>{inspection.plate_number}</h2>
             <div style={{ color:'var(--text-secondary)', fontSize:14, marginTop:4 }}>
-              {inspection.inspection_date}
+              {formatDateThai(inspection.inspection_date)}
               {inspection.inspector_name ? ` • ${inspection.inspector_name}` : ''}
               {inspection.mileage ? ` • ${inspection.mileage.toLocaleString()} km` : ''}
             </div>
@@ -207,7 +208,7 @@ export function HistoryPage() {
                         <strong>{ins.plate_number}</strong>
                         <div className="muted">
                           {ins.inspector_name ? `${ins.inspector_name} • ` : ''}
-                          {ins.inspection_date}
+                          {formatDateThai(ins.inspection_date)}
                           {photoCount > 0 && (
                             <span style={{ marginLeft:8, color:'var(--brand-primary)' }}>
                               {'📷'} {photoCount}

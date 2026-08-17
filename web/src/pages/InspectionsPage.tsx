@@ -28,6 +28,7 @@ import {
   type InspectionZone,
 } from '../inspection-workflow';
 import { getLang, t } from '../i18n';
+import { formatDateThai } from '../lib/format-date';
 
 type PhotoDraft = { id: string; url: string; file?: File };
 
@@ -832,7 +833,7 @@ export function InspectionsPage() {
                   <div className="inspection-saved-row__top">
                     <div>
                       <strong>{frequencyLabel(log.frequency)}</strong>
-                      <span>{log.inspection_date}</span>
+                      <span>{formatDateThai(log.inspection_date)}</span>
                     </div>
                     <span className={`inspection-saved-status inspection-saved-status--${log.overall_status}`}>
                       {savedStatus(log)}
