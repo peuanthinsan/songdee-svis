@@ -28,6 +28,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'PUT') {
+    if (Array.isArray(req.body?.rows)) {
+      const rows = req.body.rows as Array<{ fleetId?: string; fleetManagerEmail?: string }>;
+      if (rows.length === 0 || rows.length > 1000) return res.status(400).json({ error: 'Import must contain 1 to 1000 rows' });
+      const errors = rows.map((row, index) => !row.fleetId ? `Row ${index + 1}: Fleet ID is required` : '').filter(Boolean);
+      if (errors.length) return res.status(400).json({ error: 'Import validation failed', errors });
+      for (const row of rows) {
+        await sql`UPDATE vehicle_master SET fleet_manager_email = ${row.fleetManagerEmail || null} WHERE company_id = ${admin.companyId} AND fleet_id = ${row.fleetId}`;
+      }
+      return res.status(200).json({ imported: rows.length });
+    }
     const { fleetId, fleetManagerEmail } = req.body;
     if (!fleetId) return res.status(400).json({ error: 'fleetId required' });
     try {

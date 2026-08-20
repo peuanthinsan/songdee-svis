@@ -102,6 +102,10 @@ export function AnalyticsTab() {
         </div>
         {period === 'custom' && <DateRangePicker start={customStart} end={customEnd} onChange={({ start, end }) => { setCustomStart(start); setCustomEnd(end); }} startLabel={t('startDate')} endLabel={t('endDate')} placeholder={t('customRange')} />}
         <details style={{ fontSize: 12, marginBottom: 12 }}><summary style={{ cursor: 'pointer', fontWeight: 600 }}>{t('analyticsHowToRead')}</summary><span className="muted">{t('analyticsHowToReadText')}</span></details>
+        <details style={{ fontSize: 12, marginBottom: 12 }}>
+          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>{t('supportedImportColumns')} / {t('supportedExportColumns')}</summary>
+          <span className="muted">{t('importNotApplicable')}. {t('exportColumns')}: <strong>section</strong>, <strong>name</strong>, <strong>fleet</strong>, <strong>passed</strong>, <strong>failed</strong>, <strong>total</strong>, <strong>rate</strong>, <strong>date</strong>.</span>
+        </details>
         {loading && <p className="muted">{t('loading')}</p>}
         {error && <div className="alert alert--error">{error}</div>}
       </div>

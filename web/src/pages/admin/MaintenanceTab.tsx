@@ -264,8 +264,8 @@ export function MaintenanceTab() {
         </div>
       </div>
       <details style={{ padding: '0 20px 12px', fontSize: 12 }}>
-        <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Supported Excel/CSV columns</summary>
-        <span className="muted">Required: <strong>Plate Number</strong> or <strong>Vehicle ID</strong>. Optional: Region, Last Service Date, Last Service Mileage, Last Tire Change Date, Last Tire Change Mileage, Last Battery Change Date, Tax Expiry Date. Dates must use YYYY-MM-DD; mileage must be a whole number.</span>
+        <summary style={{ cursor: 'pointer', fontWeight: 600 }}>{t('supportedImportColumns')} / {t('supportedExportColumns')}</summary>
+        <span className="muted">{t('required')}: <strong>Plate Number</strong> or <strong>Vehicle ID</strong>. {t('optional')}: <strong>Region</strong>, <strong>Last Service Date</strong>, <strong>Last Service Mileage</strong>, <strong>Last Tire Change Date</strong>, <strong>Last Tire Change Mileage</strong>, <strong>Last Battery Change Date</strong>, <strong>Tax Expiry Date</strong>. {t('exportColumns')}: <strong>Vehicle ID</strong>, <strong>Plate Number</strong>, <strong>Fleet</strong>, <strong>Vehicle Type</strong>, <strong>Region</strong>, <strong>Last Service Date</strong>, <strong>Last Service Mileage</strong>, <strong>Last Tire Change Date</strong>, <strong>Last Tire Change Mileage</strong>, <strong>Last Battery Change Date</strong>, <strong>Tax Expiry Date</strong>.</span>
       </details>
       <div className="maintenance-filter-bar">
         <select value={regionFilter} onChange={(e) => setRegionFilter(e.target.value)} style={inputStyle} aria-label={t('region')}>

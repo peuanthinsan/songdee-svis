@@ -149,7 +149,7 @@ export default function LoginScreen() {
               contentFit="contain"
             />
           </View>
-          <Text style={styles.subtitle}>Songdee Vehicle Inspection System</Text>
+          <Text style={styles.subtitle}>{t('login.appSubtitle')}</Text>
         </View>
 
         <View style={styles.formCard}>
@@ -168,7 +168,7 @@ export default function LoginScreen() {
               <Text style={styles.companyName}>
                 {companies.find(c => c.slug === selectedCompanySlug)?.name || 'DHL Express'}
               </Text>
-              <Text style={styles.companyHint}>SVIS workspace</Text>
+              <Text style={styles.companyHint}>SVIS</Text>
             </View>
             <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
           </TouchableOpacity>
@@ -252,7 +252,7 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.poweredBy}>
-          <Text style={styles.poweredByText}>Powered by</Text>
+          <Text style={styles.poweredByText}>{t('general.poweredBy')}</Text>
           <Image
             source={require('../../assets/songdee-logo.png')}
             style={styles.poweredByLogo}

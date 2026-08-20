@@ -260,7 +260,7 @@ export default function IssueDetailScreen() {
           </View>
           <View style={styles.infoDivider} />
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Status</Text>
+            <Text style={styles.infoLabel}>{t('general.status')}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Ionicons
                 name={STATUS_ICONS[issue.status]}

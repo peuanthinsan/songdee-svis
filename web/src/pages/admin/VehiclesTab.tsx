@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { AdminFleet, AdminVehicle, fetchAdminFleets, fetchAdminVehicles, createAdminVehicle, updateAdminVehicle, deleteAdminVehicle, downloadExport } from '../../api';
+import { AdminFleet, AdminVehicle, fetchAdminFleets, fetchAdminVehicles, createAdminVehicle, updateAdminVehicle, deleteAdminVehicle, downloadExport, importAdminVehicles } from '../../api';
 import { t } from '../../i18n';
 import { useDebounce } from '../../useDebounce';
+import { parseVehicleImportFile } from '../../admin-import';
 
 type Form = { plateNumber: string; vehicleType: string; fleetId: string; fleetManagerEmail: string; vendorEmail: string; taxExpiryDate: string };
 const BLANK: Form = { plateNumber: '', vehicleType: 'car', fleetId: '', fleetManagerEmail: '', vendorEmail: '', taxExpiryDate: '' };
@@ -21,6 +22,8 @@ export function VehiclesTab() {
   const [error, setError] = useState('');
   const [listError, setListError] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const importInput = useRef<HTMLInputElement>(null);
   const offsetRef = useRef(0);
   const seqRef = useRef(0);
   const debouncedSearch = useDebounce(search, 300);
@@ -197,6 +200,20 @@ export function VehiclesTab() {
     }
   }
 
+  async function importVehicles(file?: File) {
+    if (!file) return;
+    setImporting(true); setListError('');
+    try {
+      const rows = await parseVehicleImportFile(file);
+      const errors = rows.flatMap((row) => !row.plateNumber || !row.vehicleType || !row.fleetId ? [`Row ${row.rowNumber}: Plate Number, Vehicle Type and Fleet are required`] : []);
+      if (errors.length) throw new Error(errors.slice(0, 5).join(' · '));
+      const result = await importAdminVehicles(rows.map(({ rowNumber, ...row }) => row));
+      alert(`Imported ${result.imported} vehicles`);
+      offsetRef.current = 0; setHasMore(true); load(true); fetchAdminFleets().then(setFleets).catch(() => {});
+    } catch (e: any) { setListError(e.message || t('importFailed')); }
+    finally { setImporting(false); if (importInput.current) importInput.current.value = ''; }
+  }
+
   return (
     <div className="panel panel--flush">
       <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -223,10 +240,12 @@ export function VehiclesTab() {
         <button type="button" className="btn btn--secondary" style={{ padding: '8px 16px' }} onClick={exportVehicles} disabled={exporting}>
           {exporting ? '…' : t('export')}
         </button>
+        <input ref={importInput} type="file" accept=".csv,.xlsx" hidden onChange={(e) => void importVehicles(e.target.files?.[0])} />
+        <button type="button" className="btn btn--secondary" style={{ padding: '8px 16px' }} onClick={() => importInput.current?.click()} disabled={importing}>{importing ? '…' : t('importFile')}</button>
       </div>
       <details style={{ padding: '0 20px 12px', fontSize: 12 }}>
-        <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Supported export columns</summary>
-        <span className="muted">Plate Number, Vehicle Type, Fleet, Fleet Manager Email, Vendor Email, Tax Expiry Date, Created At.</span>
+        <summary style={{ cursor: 'pointer', fontWeight: 600 }}>{t('supportedImportColumns')} / {t('supportedExportColumns')}</summary>
+        <span className="muted">{t('required')}: <strong>Plate Number</strong>, <strong>Vehicle Type</strong>, <strong>Fleet</strong>. {t('optional')}: Fleet Manager Email, Vendor Email, Tax Expiry Date. {t('exportColumns')}: <strong>Plate Number</strong>, <strong>Vehicle Type</strong>, <strong>Fleet</strong>, <strong>Fleet Manager Email</strong>, <strong>Vendor Email</strong>, <strong>Tax Expiry Date</strong>, <strong>Created At</strong>.</span>
       </details>
 
       {selected.size > 0 && (

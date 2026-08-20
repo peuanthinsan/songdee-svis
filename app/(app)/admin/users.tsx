@@ -160,11 +160,11 @@ export default function UsersManagementScreen() {
     const { username, firstName, lastName, role, fleetId, password } = form;
 
     if (!firstName.trim() || !lastName.trim() || !role) {
-      Alert.alert(t('general.error'), 'First name, last name, and role are required.');
+      Alert.alert(t('general.error'), t('admin.requiredUserDetails'));
       return;
     }
     if (!editingUser && (!username.trim() || !password.trim())) {
-      Alert.alert(t('general.error'), 'Username and password are required for new users.');
+      Alert.alert(t('general.error'), t('admin.requiredCredentials'));
       return;
     }
 

@@ -57,7 +57,7 @@ export function SettingsTab() {
               {saving ? t('saving') : t('save')}
             </button>
           </div>
-          <details style={{ fontSize: 12 }}><summary style={{ cursor: 'pointer', fontWeight: 600 }}>Supported export columns</summary><span className="muted">Setting, Value.</span></details>
+          <details style={{ fontSize: 12 }}><summary style={{ cursor: 'pointer', fontWeight: 600 }}>{t('supportedImportColumns')} / {t('supportedExportColumns')}</summary><span className="muted">{t('importNotApplicable')}. {t('exportColumns')}: <strong>Setting</strong>, <strong>Value</strong>.</span></details>
         </div>
       )}
     </div>

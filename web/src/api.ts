@@ -623,6 +623,10 @@ export function createAdminVehicle(data: { plateNumber: string; vehicleType: str
   return apiFetch<AdminVehicle>('/api/admin/vehicles', { method: 'POST', body: JSON.stringify(data) });
 }
 
+export function importAdminVehicles(rows: Array<{ plateNumber: string; vehicleType: string; fleetId: string; fleetManagerEmail?: string; vendorEmail?: string; taxExpiryDate?: string }>) {
+  return apiFetch<{ imported: number }>('/api/admin/vehicles', { method: 'POST', body: JSON.stringify({ rows }) });
+}
+
 export function updateAdminVehicle(id: string, data: { plateNumber?: string; vehicleType?: string; fleetId?: string; fleetManagerEmail?: string; vendorEmail?: string; taxExpiryDate?: string | null }) {
   return apiFetch<AdminVehicle>(`/api/admin/vehicles/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 }
@@ -644,6 +648,14 @@ export function updateAdminFleet(fleetId: string, fleetManagerEmail: string) {
     method: 'PUT',
     body: JSON.stringify({ fleetId, fleetManagerEmail }),
   });
+}
+
+export function importAdminFleets(rows: Array<{ fleetId: string; fleetManagerEmail?: string }>) {
+  return apiFetch<{ imported: number }>('/api/admin/fleets', { method: 'PUT', body: JSON.stringify({ rows }) });
+}
+
+export function importIssues(rows: Array<{ issueId: string; status: string }>) {
+  return apiFetch<{ imported: number }>('/api/issues/import', { method: 'POST', body: JSON.stringify({ rows }) });
 }
 
 export function fetchAdminChecklist(params?: { vehicleType?: string; frequency?: string }) {

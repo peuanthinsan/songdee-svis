@@ -61,6 +61,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'POST') {
+    if (Array.isArray(req.body?.rows)) {
+      const rows = req.body.rows as Array<Record<string, unknown>>;
+      if (rows.length === 0 || rows.length > 1000) return res.status(400).json({ error: 'Import must contain 1 to 1000 rows' });
+      const validTypes = ['car', 'van', 'e_van', 'motorcycle', 'e_bike'];
+      const errors: string[] = [];
+      rows.forEach((row, index) => {
+        if (!row.plateNumber || !row.vehicleType || !row.fleetId) errors.push(`Row ${index + 1}: Plate Number, Vehicle Type and Fleet are required`);
+        if (row.vehicleType && !validTypes.includes(String(row.vehicleType))) errors.push(`Row ${index + 1}: invalid vehicle type`);
+        if (row.taxExpiryDate && !isDateString(String(row.taxExpiryDate))) errors.push(`Row ${index + 1}: invalid tax expiry date`);
+      });
+      if (errors.length) return res.status(400).json({ error: 'Import validation failed', errors: errors.slice(0, 20) });
+      try {
+        const payload = JSON.stringify(rows.map((row, index) => ({
+          row_number: index + 1,
+          plate_number: row.plateNumber,
+          vehicle_type: row.vehicleType,
+          fleet_id: row.fleetId,
+          fleet_manager_email: row.fleetManagerEmail || null,
+          vendor_email: row.vendorEmail || null,
+          tax_expiry_date: row.taxExpiryDate || null,
+        })));
+        const imported = await sql`
+          INSERT INTO vehicle_master (plate_number, vehicle_type, fleet_id, company_id, fleet_manager_email, vendor_email, tax_expiry_date)
+          SELECT plate_number, vehicle_type, fleet_id, ${admin.companyId}, fleet_manager_email, vendor_email, tax_expiry_date
+          FROM jsonb_to_recordset(${payload}::jsonb) AS incoming(
+            row_number integer, plate_number text, vehicle_type text, fleet_id text,
+            fleet_manager_email text, vendor_email text, tax_expiry_date text
+          ) RETURNING id
+        `;
+        return res.status(201).json({ imported: imported.length });
+      } catch (error: any) {
+        if (error.message?.includes('unique')) return res.status(409).json({ error: 'One or more plate numbers already exist' });
+        console.error('[API] Vehicle import error:', error.message);
+        return res.status(500).json({ error: 'Import failed' });
+      }
+    }
     const { plateNumber, vehicleType, fleetId, fleetManagerEmail, vendorEmail, taxExpiryDate } = req.body;
     if (!plateNumber || !vehicleType || !fleetId) {
       return res.status(400).json({ error: 'Missing required fields' });

@@ -206,10 +206,10 @@ export default function AdminIssuesScreen() {
           UTI: 'com.microsoft.excel.xlsx',
         });
       } else {
-        Alert.alert('Export saved', result.uri);
+        Alert.alert(t('general.exportSaved'), result.uri);
       }
     } catch (err: any) {
-      Alert.alert(t('general.error'), err.message || 'Export failed');
+      Alert.alert(t('general.error'), err.message || t('general.exportFailed'));
     } finally {
       setExporting(false);
     }

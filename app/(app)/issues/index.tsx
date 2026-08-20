@@ -217,7 +217,7 @@ export default function IssuesScreen() {
   const confirmExport = async () => {
     const range = resolveDateRange();
     if (range.error) {
-      Alert.alert('Invalid Period', range.error);
+      Alert.alert(t('general.invalidPeriod'), range.error);
       return;
     }
     try {
@@ -381,7 +381,7 @@ export default function IssuesScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Export Issues</Text>
+              <Text style={styles.modalTitle}>{t('issues.export')}</Text>
               <TouchableOpacity
                 onPress={() => !exporting && setFilterVisible(false)}
                 disabled={exporting}
@@ -394,7 +394,7 @@ export default function IssuesScreen() {
             <ScrollView style={styles.modalBody} contentContainerStyle={{ paddingBottom: spacing.md }}>
               {isAdmin && (
                 <View style={styles.section}>
-                  <Text style={styles.sectionLabel}>Fleets</Text>
+                    <Text style={styles.sectionLabel}>{t('dashboard.fleets')}</Text>
                   <View style={styles.chipRow}>
                     <TouchableOpacity
                       style={[styles.chip, selectedFleets.length === 0 && styles.chipActive]}
@@ -510,7 +510,7 @@ export default function IssuesScreen() {
                 ) : (
                   <>
                     <Ionicons name="download-outline" size={16} color="#fff" />
-                    <Text style={styles.confirmBtnText}>Export</Text>
+                <Text style={styles.confirmBtnText}>{t('issues.export')}</Text>
                   </>
                 )}
               </TouchableOpacity>

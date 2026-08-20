@@ -75,7 +75,7 @@ export default function FleetsScreen() {
     if (!selectedFleet) return;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (emailInput && !emailRegex.test(emailInput.trim())) {
-      Alert.alert('', 'Invalid email format');
+      Alert.alert('', t('admin.invalidEmail'));
       return;
     }
     setSaving(true);

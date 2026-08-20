@@ -184,7 +184,7 @@ export function ChecklistImportDialog({
           <UploadIcon /> {t('downloadTemplate')}
         </button>
         <details style={{ fontSize: 12 }}>
-          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Supported import columns</summary>
+          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>{t('supportedImportColumns')}</summary>
           <div className="muted" style={{ paddingTop: 6 }}>Required: <strong>item_name_th</strong>, <strong>item_name_en</strong>. Optional: <strong>frequency</strong>, <strong>vehicle_type</strong>. The exported checklist uses these columns plus <strong>sort_order</strong>.</div>
         </details>
 

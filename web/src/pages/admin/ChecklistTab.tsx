@@ -278,6 +278,11 @@ export function ChecklistTab() {
         </div>
       </header>
 
+      <details style={{ padding: '0 20px 12px', fontSize: 12 }}>
+        <summary style={{ cursor: 'pointer', fontWeight: 600 }}>{t('supportedImportColumns')} / {t('supportedExportColumns')}</summary>
+        <span className="muted">{t('checklistImportColumns')}. {t('exportColumns')}: <strong>item_name_th</strong>, <strong>item_name_en</strong>, <strong>frequency</strong>, <strong>vehicle_type</strong>, <strong>sort_order</strong>.</span>
+      </details>
+
       {loadError && <div className="alert alert--error checklist-manager__alert">{loadError}</div>}
       {notice && <div className="checklist-manager__notice" role="status">✓ {notice}</div>}
 

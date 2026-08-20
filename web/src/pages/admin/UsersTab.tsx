@@ -196,7 +196,7 @@ export function UsersTab() {
       </div>
       <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', background: '#fafafa', display: 'grid', gap: 10 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <strong style={{ fontSize: 14 }}>Import users</strong>
+          <strong style={{ fontSize: 14 }}>{t('importUsers')}</strong>
           <select value={importMode} onChange={(e) => { setImportMode(e.target.value as UserImportMode); setImportSummary(null); }} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '7px 10px', fontSize: 13 }}>
             <option value="add">Add only</option>
             <option value="modify">Modify only</option>
@@ -206,7 +206,7 @@ export function UsersTab() {
           <button type="button" className="btn btn--secondary" onClick={previewImport} disabled={!importFile || importing}>{importing ? 'Checking…' : 'Preview'}</button>
         </div>
         <details style={{ fontSize: 12 }}>
-          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Supported Excel/CSV import and export columns</summary>
+          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>{t('supportedImportColumns')} / {t('supportedExportColumns')}</summary>
           <div className="muted" style={{ paddingTop: 6, lineHeight: 1.6 }}>
             Required: <strong>Username</strong> (or <strong>Name</strong>/<strong>Name - Surname</strong> or <strong>Email</strong>), <strong>Role</strong>.<br />
             Optional: <strong>First Name</strong>, <strong>Last Name</strong>, <strong>Fleet ID</strong> (also Fleet or Service Center), <strong>Password</strong>.<br />

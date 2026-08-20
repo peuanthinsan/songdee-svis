@@ -364,7 +364,7 @@ export default function InspectScreen() {
         setPhotosByItem(prev => ({ ...prev, [itemId]: [...(prev[itemId] || []), uri] }));
       }
     } catch (err: any) {
-      Alert.alert('Camera Error', err.message || 'Could not take photo');
+      Alert.alert(t('general.cameraError'), err.message || t('general.cameraError'));
     }
   }
 
@@ -376,7 +376,7 @@ export default function InspectScreen() {
         setPhotosByItem(prev => ({ ...prev, [itemId]: [...(prev[itemId] || []), uri] }));
       }
     } catch (err: any) {
-      Alert.alert('Gallery Error', err.message || 'Could not pick photo');
+      Alert.alert(t('general.galleryError'), err.message || t('general.galleryError'));
     }
   }
 
@@ -401,7 +401,7 @@ export default function InspectScreen() {
         setPhotos(prev => [...prev, result.assets[0].uri]);
       }
     } catch (err: any) {
-      Alert.alert('Camera Error', err.message || 'Could not take photo');
+      Alert.alert(t('general.cameraError'), err.message || t('general.cameraError'));
     }
   }
 
@@ -414,7 +414,7 @@ export default function InspectScreen() {
         setPhotos(prev => [...prev, result.assets[0].uri]);
       }
     } catch (err: any) {
-      Alert.alert('Gallery Error', err.message || 'Could not pick photo');
+      Alert.alert(t('general.galleryError'), err.message || t('general.galleryError'));
     }
   }
 
@@ -434,7 +434,7 @@ export default function InspectScreen() {
         setOdometerPhoto(result.assets[0].uri);
       }
     } catch (err: any) {
-      Alert.alert('Camera Error', err.message || 'Could not take photo');
+      Alert.alert(t('general.cameraError'), err.message || t('general.cameraError'));
     }
   }
 
@@ -445,7 +445,7 @@ export default function InspectScreen() {
         setOdometerPhoto(result.assets[0].uri);
       }
     } catch (err: any) {
-      Alert.alert('Gallery Error', err.message || 'Could not pick photo');
+      Alert.alert(t('general.galleryError'), err.message || t('general.galleryError'));
     }
   }
 
