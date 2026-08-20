@@ -285,13 +285,17 @@ function HistorySection({ fleetId, isAdmin }: { fleetId: string; isAdmin: boolea
             <Text style={historyStyles.emptyText}>{t('dashboard.noInspections')}</Text>
           ) : (
             history.inspections
-              .filter((ins) => ins.overall_status === 'fail')
               .slice(0, 10)
               .map((ins) => {
                 const dateStr = formatDateThai(ins.inspection_date);
+                const failed = ins.overall_status === 'fail';
                 return (
                   <View key={ins.id} style={historyStyles.failRow}>
-                    <Ionicons name="warning" size={20} color={colors.accent} />
+                    <Ionicons
+                      name={failed ? 'warning' : 'checkmark-circle'}
+                      size={20}
+                      color={failed ? colors.accent : colors.statusPass}
+                    />
                     <View style={{ flex: 1, marginLeft: spacing.md }}>
                       <Text style={historyStyles.failPlate}>{ins.plate_number}</Text>
                       <Text style={historyStyles.failMeta}>
@@ -299,8 +303,10 @@ function HistorySection({ fleetId, isAdmin }: { fleetId: string; isAdmin: boolea
                         {dateStr}
                       </Text>
                     </View>
-                    <View style={historyStyles.failBadge}>
-                      <Text style={historyStyles.failBadgeText}>{t('inspection.fail')}</Text>
+                    <View style={[historyStyles.failBadge, !failed && historyStyles.passBadge]}>
+                      <Text style={[historyStyles.failBadgeText, !failed && historyStyles.passBadgeText]}>
+                        {failed ? t('inspection.fail') : t('inspection.pass')}
+                      </Text>
                     </View>
                   </View>
                 );
@@ -409,6 +415,12 @@ const historyStyles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: colors.accent,
+  },
+  passBadge: {
+    backgroundColor: colors.statusPass + '15',
+  },
+  passBadgeText: {
+    color: colors.statusPass,
   },
 });
 
