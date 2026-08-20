@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { AnalyticsData, fetchAdminAnalytics } from '../../api';
 import { getLang, t } from '../../i18n';
 import { downloadCsv } from '../../data-export';
+import { DateRangePicker } from '../../components/DateRangePicker';
 
 type AnalyticsPeriod = 'all' | 'today' | 'week' | 'month' | 'custom';
 
@@ -68,7 +69,10 @@ export function AnalyticsTab() {
   useEffect(() => {
     setLoading(true);
     const dates = periodDates(period, customStart, customEnd);
-    if (period === 'custom' && (!dates.dateStart || !dates.dateEnd || dates.dateStart > dates.dateEnd)) return;
+    if (period === 'custom' && (!dates.dateStart || !dates.dateEnd || dates.dateStart > dates.dateEnd)) {
+      setLoading(false);
+      return;
+    }
     fetchAdminAnalytics(dates)
       .then((d) => { setData(d); setLoading(false); })
       .catch(() => { setError(t('error')); setLoading(false); });
@@ -96,13 +100,7 @@ export function AnalyticsTab() {
             ))}
           </div>
         </div>
-        {period === 'custom' && (
-          <div style={{ display: 'flex', gap: 12, alignItems: 'end', flexWrap: 'wrap', marginBottom: 16 }}>
-            <label className="maintenance-editor-field">{t('startDate')}<input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} /></label>
-            <label className="maintenance-editor-field">{t('endDate')}<input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} /></label>
-            {customStart && customEnd && customStart > customEnd && <span className="text-fail">{t('startAfterEnd')}</span>}
-          </div>
-        )}
+        {period === 'custom' && <DateRangePicker start={customStart} end={customEnd} onChange={({ start, end }) => { setCustomStart(start); setCustomEnd(end); }} startLabel={t('startDate')} endLabel={t('endDate')} placeholder={t('customRange')} />}
         <details style={{ fontSize: 12, marginBottom: 12 }}><summary style={{ cursor: 'pointer', fontWeight: 600 }}>{t('analyticsHowToRead')}</summary><span className="muted">{t('analyticsHowToReadText')}</span></details>
         {loading && <p className="muted">{t('loading')}</p>}
         {error && <div className="alert alert--error">{error}</div>}

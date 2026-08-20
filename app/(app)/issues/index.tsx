@@ -22,6 +22,7 @@ import { useRole } from '../../../lib/useRole';
 import { apiFetch, API_BASE, getAuthToken } from '../../../lib/api';
 import { formatDateTimeThai as formatDate } from '../../../lib/format-date';
 import { vehicleTypeLabel, type IssueStatus } from '../../../lib/types';
+import { DateField } from '../../../components/DateField';
 
 type IssueWithVehicle = {
   id: string;
@@ -482,25 +483,9 @@ export default function IssuesScreen() {
               {period === 'custom' && (
                 <View style={styles.section}>
                   <Text style={styles.sectionLabel}>{t('dashboard.from')}</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor={colors.textTertiary}
-                    value={dateStart}
-                    onChangeText={setDateStart}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
+                  <DateField label={t('dashboard.from')} value={dateStart} onChange={setDateStart} />
                   <Text style={[styles.sectionLabel, { marginTop: spacing.sm }]}>{t('dashboard.to')}</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor={colors.textTertiary}
-                    value={dateEnd}
-                    onChangeText={setDateEnd}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
+                  <DateField label={t('dashboard.to')} value={dateEnd} onChange={setDateEnd} />
                 </View>
               )}
             </ScrollView>

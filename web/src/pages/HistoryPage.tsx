@@ -6,13 +6,15 @@ import { t } from '../i18n';
 import { PhotoGrid } from '../components/PhotoGrid';
 import { formatDateThai } from '../lib/format-date';
 import { useDebounce } from '../useDebounce';
+import { DateRangePicker } from '../components/DateRangePicker';
 
-type Range = 'today' | 'week' | 'month';
+type Range = 'today' | 'week' | 'month' | 'custom';
 
-function getDateRange(range: Range) {
+function getDateRange(range: Range, customStart = '', customEnd = '') {
   const now = new Date(new Date().getTime() + 7 * 60 * 60 * 1000);
   const endDate = now.toISOString().split('T')[0];
   if (range === 'today') return { startDate: endDate, endDate };
+  if (range === 'custom') return { startDate: customStart, endDate: customEnd };
   if (range === 'week') {
     const weekAgo = new Date(now);
     weekAgo.setUTCDate(weekAgo.getUTCDate() - 7);
@@ -133,6 +135,8 @@ export function HistoryPage() {
   const requestedRange = searchParams.get('range');
   const initialRange: Range = requestedRange === 'week' || requestedRange === 'month' ? requestedRange : 'today';
   const [range, setRange] = useState<Range>(initialRange);
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
   const [history, setHistory] = useState<HistoryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<InspectionDetail | null>(null);
@@ -147,9 +151,13 @@ export function HistoryPage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      if (range === 'custom' && (!customStart || !customEnd || customStart > customEnd)) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       try {
-        const { startDate, endDate } = getDateRange(range);
+        const { startDate, endDate } = getDateRange(range, customStart, customEnd);
         const data = await fetchHistory(startDate, endDate, fleetScope, {
           search: debouncedSearch.trim(),
           limit: HISTORY_PAGE_SIZE,
@@ -166,13 +174,13 @@ export function HistoryPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [range, fleetScope, debouncedSearch]);
+  }, [range, customStart, customEnd, fleetScope, debouncedSearch]);
 
   async function loadMore() {
     if (!history || loadingMore || !hasMore) return;
     setLoadingMore(true);
     try {
-      const { startDate, endDate } = getDateRange(range);
+      const { startDate, endDate } = getDateRange(range, customStart, customEnd);
       const data = await fetchHistory(startDate, endDate, fleetScope, {
         search: debouncedSearch.trim(),
         limit: HISTORY_PAGE_SIZE,
@@ -219,7 +227,21 @@ export function HistoryPage() {
             {key === 'today' ? t('today') : key === 'week' ? t('thisWeek') : t('thisMonth')}
           </button>
         ))}
+        <button type="button" className={`chip${range === 'custom' ? ' chip--active' : ''}`} onClick={() => selectRange('custom')}>
+          {t('customRange')}
+        </button>
       </div>
+
+      {range === 'custom' && (
+        <DateRangePicker
+          start={customStart}
+          end={customEnd}
+          onChange={({ start, end }) => { setCustomStart(start); setCustomEnd(end); }}
+          startLabel={t('startDate')}
+          endLabel={t('endDate')}
+          placeholder={t('customRange')}
+        />
+      )}
 
       <div style={{ display:'flex', gap:12, alignItems:'center', flexWrap:'wrap' }}>
         <input

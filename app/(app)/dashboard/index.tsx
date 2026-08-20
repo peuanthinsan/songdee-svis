@@ -23,6 +23,7 @@ import { useAuth } from '../../../lib/auth-context';
 import { apiFetch, API_BASE, getAuthToken } from '../../../lib/api';
 import { formatDateThai } from '../../../lib/format-date';
 import { SkeletonDashboard } from '../../../components/Skeleton';
+import { DateField } from '../../../components/DateField';
 
 type FleetStat = {
   fleetId: string;
@@ -841,25 +842,9 @@ export default function DashboardScreen() {
               {period === 'custom' && (
                 <View style={styles.section}>
                   <Text style={styles.sectionLabel}>{t('dashboard.from')}</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor={colors.textTertiary}
-                    value={dateStart}
-                    onChangeText={setDateStart}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
+                  <DateField label={t('dashboard.from')} value={dateStart} onChange={setDateStart} />
                   <Text style={[styles.sectionLabel, { marginTop: spacing.sm }]}>{t('dashboard.to')}</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor={colors.textTertiary}
-                    value={dateEnd}
-                    onChangeText={setDateEnd}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
+                  <DateField label={t('dashboard.to')} value={dateEnd} onChange={setDateEnd} />
                 </View>
               )}
             </ScrollView>
