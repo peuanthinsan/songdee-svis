@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { neon } from '@neondatabase/serverless';
 import { requireAdmin } from '../../../lib/admin-auth';
+import { isDateString } from '../../../lib/validate';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const admin = await requireAdmin(req, res);
@@ -17,7 +18,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (fleetId && search) {
         const pattern = `%${search as string}%`;
         vehicles = await sql`
-          SELECT id, plate_number, vehicle_type, fleet_id, fleet_manager_email, vendor_email, created_at
+          SELECT id, plate_number, vehicle_type, fleet_id, fleet_manager_email, vendor_email, tax_expiry_date, created_at
           FROM vehicle_master
           WHERE company_id = ${admin.companyId}
             AND fleet_id = ${fleetId as string}
@@ -27,7 +28,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         `;
       } else if (fleetId) {
         vehicles = await sql`
-          SELECT id, plate_number, vehicle_type, fleet_id, fleet_manager_email, vendor_email, created_at
+          SELECT id, plate_number, vehicle_type, fleet_id, fleet_manager_email, vendor_email, tax_expiry_date, created_at
           FROM vehicle_master
           WHERE company_id = ${admin.companyId} AND fleet_id = ${fleetId as string}
           ORDER BY plate_number, id
@@ -36,7 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       } else if (search) {
         const pattern = `%${search as string}%`;
         vehicles = await sql`
-          SELECT id, plate_number, vehicle_type, fleet_id, fleet_manager_email, vendor_email, created_at
+          SELECT id, plate_number, vehicle_type, fleet_id, fleet_manager_email, vendor_email, tax_expiry_date, created_at
           FROM vehicle_master
           WHERE company_id = ${admin.companyId}
             AND (plate_number ILIKE ${pattern} OR fleet_id ILIKE ${pattern} OR vendor_email ILIKE ${pattern})
@@ -45,7 +46,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         `;
       } else {
         vehicles = await sql`
-          SELECT id, plate_number, vehicle_type, fleet_id, fleet_manager_email, vendor_email, created_at
+          SELECT id, plate_number, vehicle_type, fleet_id, fleet_manager_email, vendor_email, tax_expiry_date, created_at
           FROM vehicle_master
           WHERE company_id = ${admin.companyId}
           ORDER BY fleet_id, plate_number, id
@@ -60,7 +61,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'POST') {
-    const { plateNumber, vehicleType, fleetId, fleetManagerEmail, vendorEmail } = req.body;
+    const { plateNumber, vehicleType, fleetId, fleetManagerEmail, vendorEmail, taxExpiryDate } = req.body;
     if (!plateNumber || !vehicleType || !fleetId) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -68,11 +69,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!VALID_TYPES.includes(vehicleType)) {
       return res.status(400).json({ error: 'Invalid vehicle type' });
     }
+    if (taxExpiryDate !== undefined && taxExpiryDate !== null && !isDateString(taxExpiryDate)) {
+      return res.status(400).json({ error: 'Invalid tax expiry date' });
+    }
     try {
       const [vehicle] = await sql`
-        INSERT INTO vehicle_master (plate_number, vehicle_type, fleet_id, company_id, fleet_manager_email, vendor_email)
-        VALUES (${plateNumber}, ${vehicleType}, ${fleetId}, ${admin.companyId}, ${fleetManagerEmail || null}, ${vendorEmail || null})
-        RETURNING id, plate_number, vehicle_type, fleet_id, fleet_manager_email, vendor_email
+        INSERT INTO vehicle_master (plate_number, vehicle_type, fleet_id, company_id, fleet_manager_email, vendor_email, tax_expiry_date)
+        VALUES (${plateNumber}, ${vehicleType}, ${fleetId}, ${admin.companyId}, ${fleetManagerEmail || null}, ${vendorEmail || null}, ${taxExpiryDate || null})
+        RETURNING id, plate_number, vehicle_type, fleet_id, fleet_manager_email, vendor_email, tax_expiry_date
       `;
       return res.status(201).json(vehicle);
     } catch (error: any) {

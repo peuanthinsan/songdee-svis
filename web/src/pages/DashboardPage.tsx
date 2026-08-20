@@ -14,6 +14,7 @@ import {
   type UnitStatusData,
   type UnitStatusVehicle,
   type VehicleTypeKey,
+  type VehicleTaxExpiry,
   VEHICLE_TYPE_I18N_KEYS,
 } from '../api';
 import { useAuth } from '../AuthContext';
@@ -243,6 +244,40 @@ function MaintenanceSection({ maintData }: { maintData: MaintenanceData }) {
         <p className="muted maintenance-card__meta">
           {t('maintenanceMissingBaselines', { count: String(missingBaselines) })}
         </p>
+      )}
+    </section>
+  );
+}
+
+function VehicleTaxSection({ vehicles, today }: { vehicles: VehicleTaxExpiry[]; today: string }) {
+  const todayMs = Date.parse(`${today}T00:00:00Z`);
+  const rows = vehicles.map((vehicle) => {
+    const days = Math.round((Date.parse(`${vehicle.expiryDate}T00:00:00Z`) - todayMs) / 86_400_000);
+    return { vehicle, days };
+  });
+  const dueSoon = rows.filter((row) => row.days <= 30);
+
+  return (
+    <section className="dashboard-section">
+      <div className="section-title-row"><h2>{t('vehicleTaxExpiry')}</h2></div>
+      {dueSoon.length === 0 ? (
+        <div className="panel table-empty">
+          {vehicles.length === 0 ? t('vehicleTaxNoData') : t('vehicleTaxNoneDue')}
+        </div>
+      ) : (
+        <div className="panel">
+          <div className="defect-list" style={{ marginTop: 0 }}>
+            {dueSoon.slice(0, 10).map(({ vehicle, days }) => (
+              <div className="defect-row" key={vehicle.vehicleId}>
+                <span><strong>{vehicle.plate}</strong> · {vehicle.fleetId}</span>
+                <span className={days < 0 ? 'text-fail' : 'muted'}>
+                  {formatDateThai(vehicle.expiryDate)} · {days < 0 ? t('vehicleTaxExpired') : t('vehicleTaxDueSoon')}
+                </span>
+              </div>
+            ))}
+          </div>
+          {dueSoon.length > 10 && <p className="muted maintenance-card__meta">{t('vehicleTaxMore', { count: String(dueSoon.length - 10) })}</p>}
+        </div>
       )}
     </section>
   );
@@ -524,6 +559,7 @@ export function DashboardPage() {
       {data.unitStatus && <UnitStatusSection unitData={data.unitStatus} />}
 
       {maintData && <MaintenanceSection maintData={maintData} />}
+      <VehicleTaxSection vehicles={data.vehicleTax} today={data.date} />
     </div>
   );
 }

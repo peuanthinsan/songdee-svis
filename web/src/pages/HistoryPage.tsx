@@ -158,7 +158,9 @@ export function HistoryPage() {
   if (!user) return <Navigate to="/login" replace />;
   if (!isDashboardUser) return <Navigate to="/login" replace />;
 
-  const failed = history?.inspections.filter((i) => i.overall_status === 'fail').slice(0, 20) || [];
+  // The API returns both passed and failed inspections. The log should show
+  // both; the summary cards already provide the status breakdown.
+  const inspections = history?.inspections.slice(0, 20) || [];
 
   return (
     <div className="stack">
@@ -190,12 +192,12 @@ export function HistoryPage() {
           </div>
 
           <section>
-            <h2>{t('failed')}</h2>
+            <h2>{t('history')}</h2>
             <div className="panel panel--flush">
-              {failed.length === 0 ? (
+              {inspections.length === 0 ? (
                 <div className="table-empty">{t('noInspections')}</div>
               ) : (
-                failed.map((ins) => {
+                inspections.map((ins) => {
                   const photoCount = (ins.photo_urls?.length ?? 0) + (ins.odometer_photo_url ? 1 : 0);
                   return (
                     <div
@@ -216,7 +218,9 @@ export function HistoryPage() {
                           )}
                         </div>
                       </div>
-                      <span className="badge badge--open">{t('failed')}</span>
+                      <span className={ins.overall_status === 'fail' ? 'badge badge--open' : 'badge badge--pass'}>
+                        {ins.overall_status === 'fail' ? t('failed') : t('passed')}
+                      </span>
                     </div>
                   );
                 })

@@ -123,6 +123,13 @@ export type DefectVehicle = {
   hasVendorEmail: boolean;
 };
 
+export type VehicleTaxExpiry = {
+  vehicleId: string;
+  plate: string;
+  fleetId: string;
+  expiryDate: string;
+};
+
 export type DashboardData = {
   date: string;
   fleetId: string | null;
@@ -139,6 +146,7 @@ export type DashboardData = {
   outOfService: { total: number; today: number };
   withDefect: { total: number; today: number; vehicles: DefectVehicle[] };
   fleets: FleetStat[];
+  vehicleTax: VehicleTaxExpiry[];
   // Back-compat alias (= pre-departure / daily completion).
   overall: { total: number; checked: number; pending: number; percentage: number };
 };
@@ -481,6 +489,7 @@ export type AdminVehicle = {
   fleet_id: string;
   fleet_manager_email?: string;
   vendor_email?: string;
+  tax_expiry_date?: string | null;
   created_at: string;
 };
 
@@ -583,11 +592,11 @@ export function fetchAdminVehicles(params?: { limit?: number; offset?: number; s
   return apiFetch<AdminVehicle[]>(`/api/admin/vehicles${q ? `?${q}` : ''}`);
 }
 
-export function createAdminVehicle(data: { plateNumber: string; vehicleType: string; fleetId: string; fleetManagerEmail?: string; vendorEmail?: string }) {
+export function createAdminVehicle(data: { plateNumber: string; vehicleType: string; fleetId: string; fleetManagerEmail?: string; vendorEmail?: string; taxExpiryDate?: string }) {
   return apiFetch<AdminVehicle>('/api/admin/vehicles', { method: 'POST', body: JSON.stringify(data) });
 }
 
-export function updateAdminVehicle(id: string, data: { plateNumber?: string; vehicleType?: string; fleetId?: string; fleetManagerEmail?: string; vendorEmail?: string }) {
+export function updateAdminVehicle(id: string, data: { plateNumber?: string; vehicleType?: string; fleetId?: string; fleetManagerEmail?: string; vendorEmail?: string; taxExpiryDate?: string | null }) {
   return apiFetch<AdminVehicle>(`/api/admin/vehicles/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 }
 

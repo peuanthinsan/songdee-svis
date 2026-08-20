@@ -339,6 +339,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   font-size: 10px; line-height: 1.3; font-weight: 800; text-transform: uppercase; letter-spacing: 0.035em;
 }
 .badge--open, .badge--in_progress { background: #fff1e8; color: #a83d06; }
+.badge--pass { background: #e8f8ee; color: #168447; }
 .badge--completed, .tag--success { background: #eaf7f1; color: #116b49; }
 .tag { background: var(--surface-subtle); color: var(--text-secondary); text-transform: none; }
 .tag--warn { background: #fff8e1; color: #8a6d00; }

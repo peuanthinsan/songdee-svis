@@ -3,6 +3,7 @@ import { neon } from '@neondatabase/serverless';
 import { sendInspectionFailEmail } from '../lib/email';
 import { verifyAuth, AuthUser } from '../lib/api-auth';
 import { logAudit } from '../lib/audit';
+import { validateInspectionDate, validateInspectionFrequency, validateInspectionResults, validateMileage, validatePhotoUrls } from '../lib/inspection-validation';
 
 async function handleGet(req: VercelRequest, res: VercelResponse, user: AuthUser) {
   const { vehicleId, date, since, carryover, frequency } = req.query;
@@ -153,9 +154,8 @@ async function handlePut(req: VercelRequest, res: VercelResponse, user: AuthUser
     if (!inspectionId) {
       return res.status(400).json({ error: 'inspectionId is required' });
     }
-    if (!Array.isArray(results)) {
-      return res.status(400).json({ error: 'results must be an array' });
-    }
+    const resultError = validateInspectionResults(results);
+    if (resultError) return res.status(400).json({ error: resultError });
     const checklistItemIds = [...new Set(results.map((r: any) => r.checklistItemId).filter(Boolean))];
     const [checklistScope] = await sql`
       SELECT COUNT(*)::int AS count
@@ -167,9 +167,10 @@ async function handlePut(req: VercelRequest, res: VercelResponse, user: AuthUser
       return res.status(400).json({ error: 'Invalid checklist item' });
     }
 
+    if (!validatePhotoUrls(photoUrls)) return res.status(400).json({ error: 'Invalid inspection photos' });
     const overallStatus = results.some((r: any) => r.result === 'fail') ? 'fail' : 'pass';
-    const photosArray = (photoUrls || []) as string[];
-    const mileageNum = typeof mileage === 'number' && Number.isFinite(mileage) ? Math.floor(mileage) : null;
+    const photosArray = photoUrls ?? [];
+    const mileageNum = validateMileage(mileage) ? mileage : null;
     const odometerUrl = typeof odometerPhotoUrl === 'string' && odometerPhotoUrl ? odometerPhotoUrl : null;
     if (mileageNum === null || odometerUrl === null) {
       return res.status(400).json({ error: 'Mileage and odometer photo are required' });
@@ -334,18 +335,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Derive inspector identity from verified JWT — never trust the client
   const inspectorId = user.userId;
   const inspectorName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.username;
-  const freq = frequency === 'weekly' ? 'weekly' : frequency === 'post_route' ? 'post_route' : 'daily';
-  const mileageNum = typeof mileage === 'number' && Number.isFinite(mileage) ? Math.floor(mileage) : null;
+  const freq = validateInspectionFrequency(frequency) ? frequency : null;
+  const mileageNum = validateMileage(mileage) ? mileage : null;
   const odometerUrl = typeof odometerPhotoUrl === 'string' && odometerPhotoUrl ? odometerPhotoUrl : null;
   const sql = neon(process.env.DATABASE_URL!);
 
   try {
-    if (!vehicleId || !inspectionDate || !Array.isArray(results)) {
+    if (!vehicleId || !validateInspectionDate(inspectionDate) || !freq || !Array.isArray(results)) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
+    const resultError = validateInspectionResults(results);
+    if (resultError) return res.status(400).json({ error: resultError });
     if (mileageNum === null || odometerUrl === null) {
       return res.status(400).json({ error: 'Mileage and odometer photo are required' });
     }
+    if (!validatePhotoUrls(photoUrls)) return res.status(400).json({ error: 'Invalid inspection photos' });
     const overallStatus = results.some((r: any) => r.result === 'fail') ? 'fail' : 'pass';
 
     const [vehicleScope] = await sql`
@@ -392,7 +396,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Create inspection log (vehicle_usable stays NULL for clients that predate the question)
     const usable = typeof vehicleUsable === 'boolean' ? vehicleUsable : null;
-    const photosArray = (photoUrls || []) as string[];
+    const photosArray = photoUrls ?? [];
     const [log] = await sql`
       INSERT INTO inspection_logs (vehicle_id, inspector_id, inspector_name, fleet_id, company_id, inspection_date, overall_status, photo_urls, notes, frequency, mileage, odometer_photo_url, vehicle_usable)
       VALUES (${vehicleId}, ${inspectorId}, ${inspectorName}, ${fleetId}, ${user.companyId}, ${inspectionDate}, ${overallStatus}, ${photosArray}::text[], ${notes || ''}, ${freq}, ${mileageNum}, ${odometerUrl}, ${usable})

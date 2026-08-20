@@ -3,8 +3,8 @@ import { AdminFleet, AdminVehicle, fetchAdminFleets, fetchAdminVehicles, createA
 import { t } from '../../i18n';
 import { useDebounce } from '../../useDebounce';
 
-type Form = { plateNumber: string; vehicleType: string; fleetId: string; fleetManagerEmail: string; vendorEmail: string };
-const BLANK: Form = { plateNumber: '', vehicleType: 'car', fleetId: '', fleetManagerEmail: '', vendorEmail: '' };
+type Form = { plateNumber: string; vehicleType: string; fleetId: string; fleetManagerEmail: string; vendorEmail: string; taxExpiryDate: string };
+const BLANK: Form = { plateNumber: '', vehicleType: 'car', fleetId: '', fleetManagerEmail: '', vendorEmail: '', taxExpiryDate: '' };
 const PAGE_LIMIT = 100;
 
 export function VehiclesTab() {
@@ -96,7 +96,7 @@ export function VehiclesTab() {
 
   function openCreate() { setForm(BLANK); setModal('create'); setError(''); }
   function openEdit(v: AdminVehicle) {
-    setForm({ plateNumber: v.plate_number, vehicleType: v.vehicle_type, fleetId: v.fleet_id, fleetManagerEmail: v.fleet_manager_email || '', vendorEmail: v.vendor_email || '' });
+    setForm({ plateNumber: v.plate_number, vehicleType: v.vehicle_type, fleetId: v.fleet_id, fleetManagerEmail: v.fleet_manager_email || '', vendorEmail: v.vendor_email || '', taxExpiryDate: v.tax_expiry_date || '' });
     setModal(v); setError('');
   }
 
@@ -104,9 +104,9 @@ export function VehiclesTab() {
     setSaving(true); setError('');
     try {
       if (modal === 'create') {
-        await createAdminVehicle({ ...form, fleetManagerEmail: form.fleetManagerEmail || undefined, vendorEmail: form.vendorEmail || undefined });
+        await createAdminVehicle({ ...form, fleetManagerEmail: form.fleetManagerEmail || undefined, vendorEmail: form.vendorEmail || undefined, taxExpiryDate: form.taxExpiryDate || undefined });
       } else if (modal) {
-        await updateAdminVehicle(modal.id, { plateNumber: form.plateNumber, vehicleType: form.vehicleType, fleetId: form.fleetId, fleetManagerEmail: form.fleetManagerEmail, vendorEmail: form.vendorEmail });
+        await updateAdminVehicle(modal.id, { plateNumber: form.plateNumber, vehicleType: form.vehicleType, fleetId: form.fleetId, fleetManagerEmail: form.fleetManagerEmail, vendorEmail: form.vendorEmail, taxExpiryDate: form.taxExpiryDate || null });
       }
       setModal(null);
       offsetRef.current = 0;
@@ -307,6 +307,11 @@ export function VehiclesTab() {
               {t('vendorEmail')}
               <input type="text" value={form.vendorEmail} onChange={(e) => setForm((f) => ({ ...f, vendorEmail: e.target.value }))}
                 placeholder="vendor@repair.com, parts@repair.com"
+                style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', fontSize: 14 }} />
+            </label>
+            <label style={{ display: 'grid', gap: 4, fontSize: 13, fontWeight: 600 }}>
+              {t('vehicleTaxExpiry')}
+              <input type="date" value={form.taxExpiryDate} onChange={(e) => setForm((f) => ({ ...f, taxExpiryDate: e.target.value }))}
                 style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', fontSize: 14 }} />
             </label>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>

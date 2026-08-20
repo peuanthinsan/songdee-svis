@@ -49,6 +49,27 @@ function loadInspectionHandler(sqlCalls) {
     }
     if (specifier === '../lib/email') return { sendInspectionFailEmail: async () => {} };
     if (specifier === '../lib/audit') return { logAudit: async () => {} };
+    if (specifier === '../lib/inspection-validation') {
+      const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      return {
+        validateInspectionDate: (value) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value),
+        validateInspectionFrequency: (value) => ['daily', 'weekly', 'post_route'].includes(value),
+        validateInspectionResults: (results) => {
+          if (!Array.isArray(results) || results.length === 0) return 'At least one checklist result is required';
+          const ids = new Set();
+          for (const result of results) {
+            if (!result || typeof result.checklistItemId !== 'string' || !uuid.test(result.checklistItemId)) return 'Invalid checklist result';
+            if (ids.has(result.checklistItemId)) return 'Duplicate checklist item';
+            ids.add(result.checklistItemId);
+            if (result.result !== 'pass' && result.result !== 'fail') return 'Invalid checklist result';
+            if (result.result === 'fail' && (!Array.isArray(result.photoUrls) || result.photoUrls.length === 0)) return 'A photo is required for every failed checklist item';
+          }
+          return null;
+        },
+        validateMileage: (value) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0,
+        validatePhotoUrls: (value) => value === undefined || (Array.isArray(value) && value.every((url) => typeof url === 'string')),
+      };
+    }
     throw new Error(`Unexpected import in test: ${specifier}`);
   };
   const module = { exports: {} };

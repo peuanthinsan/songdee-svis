@@ -19,7 +19,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const topFailingVehicles = await sql`
       SELECT vm.plate_number, vm.fleet_id, COUNT(*)::int as fail_count
       FROM inspection_logs il
-      JOIN vehicle_master vm ON vm.id = il.vehicle_id
+      JOIN vehicle_master vm ON vm.id = il.vehicle_id AND vm.is_active
       WHERE il.overall_status = 'fail'
         AND il.company_id = ${admin.companyId}
         AND il.inspection_date >= ${sinceDate}
@@ -34,6 +34,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       FROM inspection_results ir
       JOIN inspection_logs il ON il.id = ir.inspection_id
       JOIN checklist_items ci ON ci.id = ir.checklist_item_id
+      JOIN vehicle_master vm ON vm.id = il.vehicle_id AND vm.is_active
       WHERE ir.result = 'fail'
         AND il.company_id = ${admin.companyId}
         AND il.inspection_date >= ${sinceDate}
@@ -50,6 +51,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         COUNT(*) FILTER (WHERE il.overall_status = 'pass')::int as passed,
         COUNT(*) FILTER (WHERE il.overall_status = 'fail')::int as failed
       FROM inspection_logs il
+      JOIN vehicle_master vm ON vm.id = il.vehicle_id AND vm.is_active
       WHERE il.company_id = ${admin.companyId}
         AND il.inspection_date >= ${sinceDate}
       GROUP BY il.fleet_id
@@ -63,7 +65,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         COUNT(*) FILTER (WHERE overall_status = 'pass')::int as passed,
         COUNT(*) FILTER (WHERE overall_status = 'fail')::int as failed
       FROM inspection_logs
-      WHERE company_id = ${admin.companyId}
+      JOIN vehicle_master vm ON vm.id = inspection_logs.vehicle_id AND vm.is_active
+      WHERE inspection_logs.company_id = ${admin.companyId}
         AND inspection_date >= ${sinceDate}
         AND frequency = 'daily'
       GROUP BY inspection_date
@@ -74,7 +77,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const totalVehicles = await sql`
       SELECT COUNT(*)::int as count
       FROM vehicle_master
-      WHERE company_id = ${admin.companyId}
+      WHERE company_id = ${admin.companyId} AND is_active
     `;
     const vehicleCount = totalVehicles[0].count;
     const completionTrend = await sql`
@@ -82,7 +85,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         inspection_date::text as date,
         COUNT(DISTINCT vehicle_id)::int as inspected
       FROM inspection_logs
-      WHERE company_id = ${admin.companyId}
+      JOIN vehicle_master vm ON vm.id = inspection_logs.vehicle_id AND vm.is_active
+      WHERE inspection_logs.company_id = ${admin.companyId}
         AND inspection_date >= ${sinceDate}
         AND frequency = 'daily'
       GROUP BY inspection_date
