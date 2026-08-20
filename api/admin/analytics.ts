@@ -35,8 +35,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       FROM inspection_logs il
       JOIN vehicle_master vm ON vm.id = il.vehicle_id AND vm.is_active
       WHERE il.company_id = ${admin.companyId}
-        AND (${sinceDate} IS NULL OR il.inspection_date >= ${sinceDate})
-        AND (${untilDate} IS NULL OR il.inspection_date <= ${untilDate})
+        AND (${sinceDate}::date IS NULL OR il.inspection_date >= ${sinceDate}::date)
+        AND (${untilDate}::date IS NULL OR il.inspection_date <= ${untilDate}::date)
       GROUP BY vm.id, vm.plate_number, vm.fleet_id
       HAVING COUNT(*) FILTER (WHERE il.overall_status = 'fail') > 0
       ORDER BY (COUNT(*) FILTER (WHERE il.overall_status = 'fail')::numeric / NULLIF(COUNT(*), 0)) DESC, fail_count DESC
@@ -52,8 +52,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       JOIN vehicle_master vm ON vm.id = il.vehicle_id AND vm.is_active
       WHERE ir.result = 'fail'
         AND il.company_id = ${admin.companyId}
-        AND (${sinceDate} IS NULL OR il.inspection_date >= ${sinceDate})
-        AND (${untilDate} IS NULL OR il.inspection_date <= ${untilDate})
+        AND (${sinceDate}::date IS NULL OR il.inspection_date >= ${sinceDate}::date)
+        AND (${untilDate}::date IS NULL OR il.inspection_date <= ${untilDate}::date)
       GROUP BY ci.id, ci.item_name_th, ci.item_name_en
       ORDER BY fail_count DESC
       LIMIT 10
@@ -70,8 +70,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       FROM inspection_logs il
       JOIN vehicle_master vm ON vm.id = il.vehicle_id AND vm.is_active
       WHERE il.company_id = ${admin.companyId}
-        AND (${sinceDate} IS NULL OR il.inspection_date >= ${sinceDate})
-        AND (${untilDate} IS NULL OR il.inspection_date <= ${untilDate})
+        AND (${sinceDate}::date IS NULL OR il.inspection_date >= ${sinceDate}::date)
+        AND (${untilDate}::date IS NULL OR il.inspection_date <= ${untilDate}::date)
       GROUP BY il.fleet_id
       ORDER BY il.fleet_id
     `;
@@ -85,8 +85,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       FROM inspection_logs
       JOIN vehicle_master vm ON vm.id = inspection_logs.vehicle_id AND vm.is_active
       WHERE inspection_logs.company_id = ${admin.companyId}
-        AND (${sinceDate} IS NULL OR inspection_date >= ${sinceDate})
-        AND (${untilDate} IS NULL OR inspection_date <= ${untilDate})
+        AND (${sinceDate}::date IS NULL OR inspection_date >= ${sinceDate}::date)
+        AND (${untilDate}::date IS NULL OR inspection_date <= ${untilDate}::date)
         AND frequency = 'daily'
       GROUP BY inspection_date
       ORDER BY inspection_date
@@ -106,8 +106,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       FROM inspection_logs
       JOIN vehicle_master vm ON vm.id = inspection_logs.vehicle_id AND vm.is_active
       WHERE inspection_logs.company_id = ${admin.companyId}
-        AND (${sinceDate} IS NULL OR inspection_date >= ${sinceDate})
-        AND (${untilDate} IS NULL OR inspection_date <= ${untilDate})
+        AND (${sinceDate}::date IS NULL OR inspection_date >= ${sinceDate}::date)
+        AND (${untilDate}::date IS NULL OR inspection_date <= ${untilDate}::date)
         AND frequency = 'daily'
       GROUP BY inspection_date
       ORDER BY inspection_date
@@ -122,8 +122,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       FROM issue_reports ir
       WHERE ir.status = 'completed'
         AND ir.company_id = ${admin.companyId}
-        AND (${sinceDate} IS NULL OR ir.updated_at::date >= ${sinceDate})
-        AND (${untilDate} IS NULL OR ir.updated_at::date <= ${untilDate})
+        AND (${sinceDate}::date IS NULL OR ir.updated_at::date >= ${sinceDate}::date)
+        AND (${untilDate}::date IS NULL OR ir.updated_at::date <= ${untilDate}::date)
       GROUP BY date_trunc('week', ir.updated_at)
       ORDER BY period
     `;
@@ -136,8 +136,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       FROM inspection_logs il
       JOIN vehicle_master vm ON vm.id = il.vehicle_id AND vm.is_active
       WHERE il.company_id = ${admin.companyId}
-        AND (${sinceDate} IS NULL OR il.inspection_date >= ${sinceDate})
-        AND (${untilDate} IS NULL OR il.inspection_date <= ${untilDate})
+        AND (${sinceDate}::date IS NULL OR il.inspection_date >= ${sinceDate}::date)
+        AND (${untilDate}::date IS NULL OR il.inspection_date <= ${untilDate}::date)
     `;
     const openIssues = await sql`
       SELECT COUNT(*)::int as count
