@@ -695,9 +695,9 @@ export function fetchAdminAnalytics(options: { days?: 7 | 30 | 90; dateStart?: s
   return apiFetch<AnalyticsData>(`/api/admin/analytics${query ? `?${query}` : ''}`);
 }
 
-export function updateIssueStatus(id: string, status: string) {
+export function updateIssueStatus(id: string, status: string, completionPhotoUrls?: string[]) {
   return apiFetch<{ ok: boolean }>(`/api/issues/${id}`, {
     method: 'PATCH',
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ status, ...(completionPhotoUrls ? { completionPhotoUrls } : {}) }),
   });
 }

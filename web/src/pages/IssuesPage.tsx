@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
-import { fetchIssues, type IssueRow } from '../api';
+import { fetchIssues, type IssueRow, updateIssueStatus, uploadInspectionPhoto } from '../api';
 import { useAuth } from '../AuthContext';
 import { t } from '../i18n';
 import { PhotoGrid } from '../components/PhotoGrid';
@@ -15,7 +15,13 @@ function statusLabel(status: string) {
   return status;
 }
 
-function IssueModal({ issue, onClose }: { issue: IssueRow; onClose: () => void }) {
+function IssueModal({ issue, onClose, onStartRepair, onCompleteRepair, updating }: {
+  issue: IssueRow;
+  onClose: () => void;
+  onStartRepair: () => void;
+  onCompleteRepair: (file: File) => void;
+  updating: boolean;
+}) {
   const hasPhotos = (issue.defect_photo_urls?.length ?? 0) + (issue.completion_photo_urls?.length ?? 0) > 0;
   return (
     <div
@@ -53,6 +59,32 @@ function IssueModal({ issue, onClose }: { issue: IssueRow; onClose: () => void }
           </div>
         )}
 
+        {issue.status !== 'completed' && (
+          <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+            {issue.status === 'open' && (
+              <button type="button" className="btn btn--secondary" onClick={onStartRepair} disabled={updating}>
+                {updating ? '…' : `→ ${t('inProgress')}`}
+              </button>
+            )}
+            {issue.status === 'in_progress' && (
+              <>
+                <input ref={(node) => { if (node) (node as HTMLInputElement).dataset.ready = 'true'; }} type="file" accept="image/jpeg,image/png" hidden onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = '';
+                  if (file) onCompleteRepair(file);
+                }} />
+                <button type="button" className="btn btn--primary" onClick={(event) => {
+                  const input = (event.currentTarget.previousElementSibling as HTMLInputElement | null);
+                  input?.click();
+                }} disabled={updating}>
+                  {updating ? '…' : `✓ ${t('completed')} — ${t('completionPhotos')}`}
+                </button>
+                <div className="muted" style={{ marginTop: 8, fontSize: 12 }}>{t('completionPhotoRequired')}</div>
+              </>
+            )}
+          </div>
+        )}
+
         <div style={{ marginTop:24, display:'flex', justifyContent:'flex-end' }}>
           <button type="button" className="btn btn--ghost" onClick={onClose}>{t('cancel')}</button>
         </div>
@@ -72,6 +104,7 @@ export function IssuesPage() {
   const [issues, setIssues] = useState<IssueRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<IssueRow | null>(null);
+  const [updating, setUpdating] = useState(false);
 
   const fleetScope = user?.role === 'admin' ? undefined : user?.fleetId;
 
@@ -94,6 +127,33 @@ export function IssuesPage() {
   function selectStatus(nextStatus: (typeof statuses)[number]) {
     setStatus(nextStatus);
     setSearchParams(nextStatus ? { status: nextStatus } : {});
+  }
+
+  async function startRepair() {
+    if (!selected) return;
+    setUpdating(true);
+    try {
+      await updateIssueStatus(selected.id, 'in_progress');
+      const next = { ...selected, status: 'in_progress' };
+      setSelected(next);
+      setIssues((prev) => prev.map((issue) => issue.id === next.id ? next : issue));
+    } catch (e: any) {
+      alert(e.message || t('error'));
+    } finally { setUpdating(false); }
+  }
+
+  async function completeRepair(file: File) {
+    if (!selected) return;
+    setUpdating(true);
+    try {
+      const { url } = await uploadInspectionPhoto(file);
+      await updateIssueStatus(selected.id, 'completed', [url]);
+      const next = { ...selected, status: 'completed', completion_photo_urls: [url] };
+      setSelected(next);
+      setIssues((prev) => prev.map((issue) => issue.id === next.id ? next : issue));
+    } catch (e: any) {
+      alert(e.message || t('error'));
+    } finally { setUpdating(false); }
   }
 
   if (!user) return <Navigate to="/login" replace />;
@@ -160,7 +220,7 @@ export function IssuesPage() {
         )}
       </div>
 
-      {selected && <IssueModal issue={selected} onClose={() => setSelected(null)} />}
+      {selected && <IssueModal issue={selected} onClose={() => setSelected(null)} onStartRepair={() => void startRepair()} onCompleteRepair={(file) => void completeRepair(file)} updating={updating} />}
     </div>
   );
 }

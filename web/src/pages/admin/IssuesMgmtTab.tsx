@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { downloadExport, IssueRow, fetchIssues, updateIssueStatus } from '../../api';
+import { useEffect, useRef, useState } from 'react';
+import { downloadExport, IssueRow, fetchIssues, updateIssueStatus, uploadInspectionPhoto } from '../../api';
 import { t } from '../../i18n';
 import { formatDateThai, formatDateTimeThai } from '../../lib/format-date';
 
@@ -12,6 +12,9 @@ export function IssuesMgmtTab() {
   const [error, setError] = useState('');
   const [updating, setUpdating] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [completionIssue, setCompletionIssue] = useState<IssueRow | null>(null);
+  const [uploadingCompletion, setUploadingCompletion] = useState(false);
+  const completionInput = useRef<HTMLInputElement>(null);
 
   function load(status: string) {
     setLoading(true);
@@ -29,11 +32,9 @@ export function IssuesMgmtTab() {
   }
 
   async function changeStatus(issue: IssueRow, newStatus: string) {
-    // The dashboard does not have a completion-photo upload flow yet. Keep the
-    // client from sending an inevitably invalid request (and from showing a
-    // misleading status transition if an older API is deployed).
     if (newStatus === 'completed') {
-      alert('Completion photo required to close an issue');
+      setCompletionIssue(issue);
+      completionInput.current?.click();
       return;
     }
 
@@ -47,6 +48,23 @@ export function IssuesMgmtTab() {
       alert(e.message || t('error'));
     } finally {
       setUpdating(null);
+    }
+  }
+
+  async function completeWithPhoto(file: File) {
+    if (!completionIssue) return;
+    setUploadingCompletion(true);
+    try {
+      const { url } = await uploadInspectionPhoto(file);
+      await updateIssueStatus(completionIssue.id, 'completed', [url]);
+      setIssues((prev) => filter === 'all'
+        ? prev.map((i) => i.id === completionIssue.id ? { ...i, status: 'completed', completion_photo_urls: [url] } : i)
+        : prev.filter((i) => i.id !== completionIssue.id));
+    } catch (e: any) {
+      alert(e.message || t('error'));
+    } finally {
+      setUploadingCompletion(false);
+      setCompletionIssue(null);
     }
   }
 
@@ -66,7 +84,13 @@ export function IssuesMgmtTab() {
           ))}
         </div>
       </div>
-      <details style={{ padding: '0 20px 12px', fontSize: 12 }}><summary style={{ cursor: 'pointer', fontWeight: 600 }}>Supported export columns</summary><span className="muted">Plate Number, Fleet, Vehicle Type, Status, Inspector, Inspection Date, Created, Defect 1–3, Repair 1–3.</span></details>
+      <details style={{ padding: '0 20px 12px', fontSize: 12 }}><summary style={{ cursor: 'pointer', fontWeight: 600 }}>{t('supportedImportColumns')} / {t('supportedExportColumns')}</summary><span className="muted">{t('importNotApplicable')}. {t('exportColumns')}: <strong>#, Plate Number, Fleet, Vehicle Type, Status, Inspector, Inspection Date, Created, Defect 1–3, Repair 1–3</strong>.</span></details>
+      <input ref={completionInput} type="file" accept="image/jpeg,image/png" hidden disabled={uploadingCompletion} onChange={(event) => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (file) void completeWithPhoto(file);
+      }} />
+      {uploadingCompletion && <div className="alert" style={{ margin: 12 }}>{t('uploading')}</div>}
       {error && <div className="alert alert--error" style={{ margin: 12 }}>{error}</div>}
       {loading ? (
         <p className="muted" style={{ padding: 20 }}>{t('loading')}</p>
