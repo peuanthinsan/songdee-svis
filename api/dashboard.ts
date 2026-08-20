@@ -107,7 +107,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         SELECT
           COUNT(DISTINCT vehicle_id)::int AS total,
           (COUNT(DISTINCT vehicle_id) FILTER (
-            WHERE (created_at AT TIME ZONE 'Asia/Bangkok')::date = ${today}::date
+            WHERE (ir.created_at AT TIME ZONE 'Asia/Bangkok')::date = ${today}::date
           ))::int AS today
         FROM issue_reports ir
         JOIN vehicle_master vm ON vm.id = ir.vehicle_id AND vm.is_active
