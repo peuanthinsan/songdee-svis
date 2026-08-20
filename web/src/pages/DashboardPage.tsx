@@ -230,7 +230,7 @@ function MaintenanceSection({ maintData, vehicleTax, today }: { maintData: Maint
             </button>
           );
         })}
-        <VehicleTaxCard
+        <VehicleTaxSection
           vehicles={vehicleTax}
           today={today}
           active={focus === 'tax'}
@@ -285,7 +285,7 @@ function MaintenanceSection({ maintData, vehicleTax, today }: { maintData: Maint
   );
 }
 
-function VehicleTaxCard({
+function VehicleTaxSection({
   vehicles,
   today,
   active,
