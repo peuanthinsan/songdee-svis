@@ -168,8 +168,10 @@ function maintDetail(info: MaintenanceCategory): string {
   return parts.join(' · ');
 }
 
-function MaintenanceSection({ maintData }: { maintData: MaintenanceData }) {
+function MaintenanceSection({ maintData, vehicleTax, today }: { maintData: MaintenanceData; vehicleTax: VehicleTaxExpiry[]; today: string }) {
   const days = String(maintData.horizonDays);
+  type Focus = 'checkup' | 'tires' | 'battery' | 'tax';
+  const [focus, setFocus] = useState<Focus | null>(null);
 
   // One row per vehicle-category that is due or overdue, overdue first.
   const dueList = maintData.vehicles
@@ -185,6 +187,11 @@ function MaintenanceSection({ maintData }: { maintData: MaintenanceData }) {
   const missingBaselines = maintData.vehicles.filter((v) =>
     v.checkup.status === 'noData' && v.tires.status === 'noData' && v.battery.status === 'noData',
   ).length;
+  const todayMs = Date.parse(`${today}T00:00:00Z`);
+  const taxRows = vehicleTax.map((vehicle) => ({
+    vehicle,
+    days: Math.round((Date.parse(`${vehicle.expiryDate}T00:00:00Z`) - todayMs) / 86_400_000),
+  })).sort((a, b) => a.days - b.days);
 
   return (
     <section className="dashboard-section">
@@ -195,8 +202,16 @@ function MaintenanceSection({ maintData }: { maintData: MaintenanceData }) {
         {MAINT_CATEGORIES.map((c) => {
           const s = maintData.summary[c.key];
           const dueCount = s.due + s.overdue;
+          const active = focus === c.key;
           return (
-            <div key={c.key} className="panel maintenance-card">
+            <button
+              key={c.key}
+              type="button"
+              className="panel maintenance-card"
+              onClick={() => setFocus(active ? null : c.key)}
+              aria-expanded={active}
+              style={{ textAlign: 'left', cursor: 'pointer', font: 'inherit', color: 'inherit' }}
+            >
               <div className="maintenance-card__heading">
                 <div>
                   <strong>{t(c.labelKey)}</strong>
@@ -212,16 +227,27 @@ function MaintenanceSection({ maintData }: { maintData: MaintenanceData }) {
                   <span className="maintenance-card__overdue"> · {t('maintenanceOverdue')} {s.overdue}</span>
                 )}
               </div>
-            </div>
+            </button>
           );
         })}
+        <VehicleTaxCard
+          vehicles={vehicleTax}
+          today={today}
+          active={focus === 'tax'}
+          onClick={() => setFocus(focus === 'tax' ? null : 'tax')}
+        />
       </div>
 
-      {dueList.length === 0 ? (
-        <div className="panel table-empty">
-          {t('maintenanceNoneDue', { days })}
-        </div>
-      ) : (
+      {focus && (
+        <MaintenanceFocusList
+          focus={focus}
+          vehicles={maintData.vehicles}
+          taxRows={taxRows}
+          days={days}
+        />
+      )}
+
+      {!focus && (dueList.length > 0 || taxRows.length > 0) && (
         <div className="panel">
           <div className="defect-list" style={{ marginTop: 0 }}>
             {dueList.slice(0, 10).map((e) => (
@@ -236,6 +262,16 @@ function MaintenanceSection({ maintData }: { maintData: MaintenanceData }) {
                 </span>
               </div>
             ))}
+            {taxRows.slice(0, Math.max(0, 10 - dueList.length)).map(({ vehicle, days: daysRemaining }) => {
+              return (
+                <div className="defect-row" key={`${vehicle.vehicleId}-tax-expiry`}>
+                  <span>{vehicle.plate} · {vehicle.fleetId}</span>
+                  <span className={daysRemaining < 0 ? 'text-fail' : 'muted'}>
+                    {t('vehicleTaxExpiry')} · {formatDateThai(vehicle.expiryDate)} · {daysRemaining < 0 ? t('vehicleTaxExpired') : t('vehicleTaxDueSoon')}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -249,37 +285,94 @@ function MaintenanceSection({ maintData }: { maintData: MaintenanceData }) {
   );
 }
 
-function VehicleTaxSection({ vehicles, today }: { vehicles: VehicleTaxExpiry[]; today: string }) {
+function VehicleTaxCard({
+  vehicles,
+  today,
+  active,
+  onClick,
+}: {
+  vehicles: VehicleTaxExpiry[];
+  today: string;
+  active: boolean;
+  onClick: () => void;
+}) {
   const todayMs = Date.parse(`${today}T00:00:00Z`);
-  const rows = vehicles.map((vehicle) => {
+  const dueSoon = vehicles.filter((vehicle) => {
     const days = Math.round((Date.parse(`${vehicle.expiryDate}T00:00:00Z`) - todayMs) / 86_400_000);
-    return { vehicle, days };
+    return days <= 30;
   });
-  const dueSoon = rows.filter((row) => row.days <= 30);
 
   return (
-    <section className="dashboard-section">
-      <div className="section-title-row"><h2>{t('vehicleTaxExpiry')}</h2></div>
-      {dueSoon.length === 0 ? (
-        <div className="panel table-empty">
-          {vehicles.length === 0 ? t('vehicleTaxNoData') : t('vehicleTaxNoneDue')}
+    <button
+      type="button"
+      className="panel maintenance-card"
+      onClick={onClick}
+      aria-expanded={active}
+      style={{ textAlign: 'left', cursor: 'pointer', font: 'inherit', color: 'inherit' }}
+    >
+      <div className="maintenance-card__heading">
+        <div>
+          <strong>{t('vehicleTaxExpiry')}</strong>
+          <div className="maintenance-card__rule">{t('vehicleTaxDueSoon')}</div>
         </div>
+        <div className="maintenance-card__count" style={{ color: dueSoon.length > 0 ? 'var(--status-fail)' : 'var(--status-pass)' }}>
+          {vehicles.length}
+        </div>
+      </div>
+      <div className="maintenance-card__meta">
+          {vehicles.length === 0 ? t('vehicleTaxNoData') : t('vehicleTaxRecorded', { count: String(vehicles.length) })}
+      </div>
+    </button>
+  );
+}
+
+function MaintenanceFocusList({
+  focus,
+  vehicles,
+  taxRows,
+  days,
+}: {
+  focus: 'checkup' | 'tires' | 'battery' | 'tax';
+  vehicles: MaintenanceData['vehicles'];
+  taxRows: Array<{ vehicle: VehicleTaxExpiry; days: number }>;
+  days: string;
+}) {
+  const rows = focus === 'tax'
+    ? taxRows.map(({ vehicle, days: daysRemaining }) => ({
+      key: `${vehicle.vehicleId}-tax`, plate: vehicle.plate, fleet: vehicle.fleetId,
+      detail: `${formatDateThai(vehicle.expiryDate)} · ${daysRemaining < 0 ? t('vehicleTaxExpired') : daysRemaining <= 30 ? t('vehicleTaxDueSoon') : ''}`,
+      urgent: daysRemaining <= 30,
+    }))
+    : vehicles
+      .filter((vehicle) => vehicle[focus].status === 'due' || vehicle[focus].status === 'overdue')
+      .map((vehicle) => ({
+        key: vehicle.vehicleId,
+        plate: vehicle.plate,
+        fleet: vehicle.fleetId,
+        detail: maintDetail(vehicle[focus]),
+        urgent: vehicle[focus].status === 'overdue',
+      }));
+
+  const label = focus === 'tax' ? t('vehicleTaxExpiry') : t(MAINT_CATEGORIES.find((category) => category.key === focus)!.labelKey);
+
+  return (
+    <div className="panel" style={{ marginTop: 12 }}>
+      <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', fontWeight: 700 }}>
+        {label} · {rows.length}
+      </div>
+      {rows.length === 0 ? (
+        <div className="table-empty">{focus === 'tax' ? t('vehicleTaxNoData') : t('maintenanceNoneDue', { days })}</div>
       ) : (
-        <div className="panel">
-          <div className="defect-list" style={{ marginTop: 0 }}>
-            {dueSoon.slice(0, 10).map(({ vehicle, days }) => (
-              <div className="defect-row" key={vehicle.vehicleId}>
-                <span><strong>{vehicle.plate}</strong> · {vehicle.fleetId}</span>
-                <span className={days < 0 ? 'text-fail' : 'muted'}>
-                  {formatDateThai(vehicle.expiryDate)} · {days < 0 ? t('vehicleTaxExpired') : t('vehicleTaxDueSoon')}
-                </span>
-              </div>
-            ))}
-          </div>
-          {dueSoon.length > 10 && <p className="muted maintenance-card__meta">{t('vehicleTaxMore', { count: String(dueSoon.length - 10) })}</p>}
+        <div className="defect-list" style={{ marginTop: 0 }}>
+          {rows.map((row) => (
+            <div className="defect-row" key={row.key}>
+              <span><strong>{row.plate}</strong> · {row.fleet}</span>
+              <span className={row.urgent ? 'text-fail' : 'muted'}>{row.detail}</span>
+            </div>
+          ))}
         </div>
       )}
-    </section>
+    </div>
   );
 }
 
@@ -558,8 +651,7 @@ export function DashboardPage() {
 
       {data.unitStatus && <UnitStatusSection unitData={data.unitStatus} />}
 
-      {maintData && <MaintenanceSection maintData={maintData} />}
-      <VehicleTaxSection vehicles={data.vehicleTax} today={data.date} />
+      {maintData && <MaintenanceSection maintData={maintData} vehicleTax={data.vehicleTax} today={data.date} />}
     </div>
   );
 }

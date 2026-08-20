@@ -9,22 +9,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!admin) return;
 
   const sql = neon(process.env.DATABASE_URL!);
-  const days = parseInt(req.query.days as string) || 30;
+  const requestedDays = parseInt(req.query.days as string);
+  const dateStartParam = typeof req.query.dateStart === 'string' ? req.query.dateStart : null;
+  const dateEndParam = typeof req.query.dateEnd === 'string' ? req.query.dateEnd : null;
+  const allTime = req.query.allTime === '1';
+  const validDate = (value: string | null) => !value || /^\d{4}-\d{2}-\d{2}$/.test(value);
+  if (!validDate(dateStartParam) || !validDate(dateEndParam)) return res.status(400).json({ error: 'Invalid date range' });
+  if (dateStartParam && dateEndParam && dateStartParam > dateEndParam) return res.status(400).json({ error: 'Start date must not be after end date' });
+  const days = Number.isFinite(requestedDays) && requestedDays > 0 ? requestedDays : 30;
   const now = new Date(Date.now() + 7 * 60 * 60 * 1000); // Thai timezone
   now.setUTCDate(now.getUTCDate() - days);
-  const sinceDate = now.toISOString().split('T')[0];
+  const sinceDate: string | null = allTime ? null : dateStartParam || now.toISOString().split('T')[0];
+  const untilDate = dateEndParam;
 
   try {
     // 1. Top failing vehicles (top 10)
     const topFailingVehicles = await sql`
-      SELECT vm.plate_number, vm.fleet_id, COUNT(*)::int as fail_count
+      SELECT
+        vm.plate_number,
+        vm.fleet_id,
+        COUNT(*)::int as inspection_count,
+        COUNT(*) FILTER (WHERE il.overall_status = 'fail')::int as fail_count,
+        MAX(il.inspection_date)::text as last_inspection_date,
+        MAX(il.inspection_date) FILTER (WHERE il.overall_status = 'fail')::text as last_failed_date
       FROM inspection_logs il
       JOIN vehicle_master vm ON vm.id = il.vehicle_id AND vm.is_active
-      WHERE il.overall_status = 'fail'
-        AND il.company_id = ${admin.companyId}
-        AND il.inspection_date >= ${sinceDate}
+      WHERE il.company_id = ${admin.companyId}
+        AND (${sinceDate} IS NULL OR il.inspection_date >= ${sinceDate})
+        AND (${untilDate} IS NULL OR il.inspection_date <= ${untilDate})
       GROUP BY vm.id, vm.plate_number, vm.fleet_id
-      ORDER BY fail_count DESC
+      HAVING COUNT(*) FILTER (WHERE il.overall_status = 'fail') > 0
+      ORDER BY (COUNT(*) FILTER (WHERE il.overall_status = 'fail')::numeric / NULLIF(COUNT(*), 0)) DESC, fail_count DESC
       LIMIT 10
     `;
 
@@ -37,7 +52,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       JOIN vehicle_master vm ON vm.id = il.vehicle_id AND vm.is_active
       WHERE ir.result = 'fail'
         AND il.company_id = ${admin.companyId}
-        AND il.inspection_date >= ${sinceDate}
+        AND (${sinceDate} IS NULL OR il.inspection_date >= ${sinceDate})
+        AND (${untilDate} IS NULL OR il.inspection_date <= ${untilDate})
       GROUP BY ci.id, ci.item_name_th, ci.item_name_en
       ORDER BY fail_count DESC
       LIMIT 10
@@ -49,11 +65,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         il.fleet_id,
         COUNT(*)::int as total,
         COUNT(*) FILTER (WHERE il.overall_status = 'pass')::int as passed,
-        COUNT(*) FILTER (WHERE il.overall_status = 'fail')::int as failed
+        COUNT(*) FILTER (WHERE il.overall_status = 'fail')::int as failed,
+        COUNT(DISTINCT vm.id)::int as active_vehicles
       FROM inspection_logs il
       JOIN vehicle_master vm ON vm.id = il.vehicle_id AND vm.is_active
       WHERE il.company_id = ${admin.companyId}
-        AND il.inspection_date >= ${sinceDate}
+        AND (${sinceDate} IS NULL OR il.inspection_date >= ${sinceDate})
+        AND (${untilDate} IS NULL OR il.inspection_date <= ${untilDate})
       GROUP BY il.fleet_id
       ORDER BY il.fleet_id
     `;
@@ -67,7 +85,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       FROM inspection_logs
       JOIN vehicle_master vm ON vm.id = inspection_logs.vehicle_id AND vm.is_active
       WHERE inspection_logs.company_id = ${admin.companyId}
-        AND inspection_date >= ${sinceDate}
+        AND (${sinceDate} IS NULL OR inspection_date >= ${sinceDate})
+        AND (${untilDate} IS NULL OR inspection_date <= ${untilDate})
         AND frequency = 'daily'
       GROUP BY inspection_date
       ORDER BY inspection_date
@@ -87,7 +106,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       FROM inspection_logs
       JOIN vehicle_master vm ON vm.id = inspection_logs.vehicle_id AND vm.is_active
       WHERE inspection_logs.company_id = ${admin.companyId}
-        AND inspection_date >= ${sinceDate}
+        AND (${sinceDate} IS NULL OR inspection_date >= ${sinceDate})
+        AND (${untilDate} IS NULL OR inspection_date <= ${untilDate})
         AND frequency = 'daily'
       GROUP BY inspection_date
       ORDER BY inspection_date
@@ -102,13 +122,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       FROM issue_reports ir
       WHERE ir.status = 'completed'
         AND ir.company_id = ${admin.companyId}
-        AND ir.updated_at >= ${sinceDate}
+        AND (${sinceDate} IS NULL OR ir.updated_at::date >= ${sinceDate})
+        AND (${untilDate} IS NULL OR ir.updated_at::date <= ${untilDate})
       GROUP BY date_trunc('week', ir.updated_at)
       ORDER BY period
     `;
 
+    const summary = await sql`
+      SELECT
+        COUNT(*)::int as total_inspections,
+        COUNT(*) FILTER (WHERE overall_status = 'pass')::int as passed,
+        COUNT(*) FILTER (WHERE overall_status = 'fail')::int as failed
+      FROM inspection_logs il
+      JOIN vehicle_master vm ON vm.id = il.vehicle_id AND vm.is_active
+      WHERE il.company_id = ${admin.companyId}
+        AND (${sinceDate} IS NULL OR il.inspection_date >= ${sinceDate})
+        AND (${untilDate} IS NULL OR il.inspection_date <= ${untilDate})
+    `;
+    const openIssues = await sql`
+      SELECT COUNT(*)::int as count
+      FROM issue_reports ir
+      JOIN vehicle_master vm ON vm.id = ir.vehicle_id AND vm.is_active
+      WHERE ir.company_id = ${admin.companyId}
+        AND ir.status IN ('open', 'in_progress')
+    `;
+
     res.status(200).json({
-      topFailingVehicles,
+      topFailingVehicles: topFailingVehicles.map((v: any) => ({
+        ...v,
+        fail_rate: v.inspection_count > 0 ? Math.round((v.fail_count / v.inspection_count) * 100) : 0,
+      })),
       topFailingItems,
       fleetStats,
       dailyTrend,
@@ -118,7 +161,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         rate: vehicleCount > 0 ? Math.round((d.inspected / vehicleCount) * 100) : 0,
       })),
       resolutionTrend,
-      period: { days, since: sinceDate },
+      summary: {
+        totalInspections: summary[0].total_inspections,
+        passed: summary[0].passed,
+        failed: summary[0].failed,
+        passRate: summary[0].total_inspections > 0 ? Math.round((summary[0].passed / summary[0].total_inspections) * 100) : 0,
+        openIssues: openIssues[0].count,
+        activeVehicles: vehicleCount,
+      },
+      period: { days: allTime || dateStartParam || dateEndParam ? null : days, since: sinceDate, until: untilDate },
     });
   } catch (error: any) {
     console.error('[API] Error:', error.message);

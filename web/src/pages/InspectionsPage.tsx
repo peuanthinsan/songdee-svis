@@ -261,7 +261,11 @@ export function InspectionsPage() {
 
         const existing = activeInspections[0];
         if (existing) {
-          const canEdit = activeUser.role === 'admin' || existing.inspector_id === activeUser.id;
+          // Supervisors can complete or correct inspections for vehicles in their
+          // fleet. The API enforces the same fleet boundary; admins remain global.
+          const canEdit = activeUser.role === 'admin'
+            || activeUser.role === 'supervisor'
+            || existing.inspector_id === activeUser.id;
           setExistingInspectionId(existing.id);
           setReadOnly(!canEdit);
           setReadOnlyInspector(existing.inspector_name || '');

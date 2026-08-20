@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AdminFleet, fetchAdminFleets, updateAdminFleet } from '../../api';
 import { t } from '../../i18n';
+import { downloadCsv } from '../../data-export';
 
 export function FleetsTab() {
   const [fleets, setFleets] = useState<AdminFleet[]>([]);
@@ -17,6 +18,10 @@ export function FleetsTab() {
       .catch(() => { setError(t('error')); setLoading(false); });
   }
   useEffect(load, []);
+
+  function exportFleets() {
+    downloadCsv('fleets.csv', ['fleet_id', 'vehicle_count', 'fleet_manager_email'], fleets.map((f) => [f.fleet_id, f.vehicle_count, f.fleet_manager_email || '']));
+  }
 
   function startEdit(f: AdminFleet) {
     setEditing(f.fleet_id);
@@ -39,7 +44,8 @@ export function FleetsTab() {
   return (
     <div className="panel panel--flush">
       <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
-        <h2 style={{ margin: 0 }}>{t('adminFleets')}</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><h2 style={{ margin: 0, flex: 1 }}>{t('adminFleets')}</h2><button type="button" className="btn btn--secondary" onClick={exportFleets} disabled={loading || fleets.length === 0}>{t('export')}</button></div>
+        <details style={{ marginTop: 10, fontSize: 12 }}><summary style={{ cursor: 'pointer', fontWeight: 600 }}>Supported export columns</summary><span className="muted">Fleet ID, Vehicle Count, Fleet Manager Email.</span></details>
       </div>
       {error && <div className="alert alert--error" style={{ margin: 12 }}>{error}</div>}
       {loading ? (

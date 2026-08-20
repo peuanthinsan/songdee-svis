@@ -55,9 +55,12 @@ type HistoryInspection = {
   vehicle_id: string;
   plate_number: string;
   vehicle_type: string;
+  fleet_id: string;
   overall_status: string;
   inspection_date: string;
   inspector_name?: string;
+  frequency?: string;
+  mileage?: number | null;
 };
 
 type HistoryData = {
@@ -299,8 +302,16 @@ function HistorySection({ fleetId, isAdmin }: { fleetId: string; isAdmin: boolea
                     <View style={{ flex: 1, marginLeft: spacing.md }}>
                       <Text style={historyStyles.failPlate}>{ins.plate_number}</Text>
                       <Text style={historyStyles.failMeta}>
-                        {ins.inspector_name ? `${ins.inspector_name} \u2022 ` : ''}
-                        {dateStr}
+                        {t('inspection.fleet')}: {ins.fleet_id}
+                        {' \u2022 '}{t('inspection.vehicleType')}: {ins.vehicle_type}
+                      </Text>
+                      <Text style={historyStyles.failMeta}>
+                        {t('inspection.date')}: {dateStr}
+                        {' \u2022 '}{t('inspection.inspector')}: {ins.inspector_name || '-'}
+                      </Text>
+                      <Text style={historyStyles.failMeta}>
+                        {t('inspection.event')}: {ins.frequency || '-'}
+                        {' \u2022 '}{t('inspection.mileage')}: {ins.mileage != null ? `${ins.mileage.toLocaleString()} km` : '-'}
                       </Text>
                     </View>
                     <View style={[historyStyles.failBadge, !failed && historyStyles.passBadge]}>

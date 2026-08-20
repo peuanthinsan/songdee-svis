@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AdminFleet, AdminVehicle, fetchAdminFleets, fetchAdminVehicles, createAdminVehicle, updateAdminVehicle, deleteAdminVehicle } from '../../api';
+import { AdminFleet, AdminVehicle, fetchAdminFleets, fetchAdminVehicles, createAdminVehicle, updateAdminVehicle, deleteAdminVehicle, downloadExport } from '../../api';
 import { t } from '../../i18n';
 import { useDebounce } from '../../useDebounce';
 
@@ -20,6 +20,7 @@ export function VehiclesTab() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [listError, setListError] = useState('');
+  const [exporting, setExporting] = useState(false);
   const offsetRef = useRef(0);
   const seqRef = useRef(0);
   const debouncedSearch = useDebounce(search, 300);
@@ -181,6 +182,21 @@ export function VehiclesTab() {
     setSelected((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
   }
 
+  async function exportVehicles() {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const params = new URLSearchParams();
+      if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
+      if (fleetFilter !== 'all') params.set('fleetId', fleetFilter);
+      await downloadExport(`/api/admin/vehicles/export?${params.toString()}`, 'vehicles.xlsx');
+    } catch (e: any) {
+      alert(e.message || t('exportFailed'));
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <div className="panel panel--flush">
       <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -204,7 +220,14 @@ export function VehiclesTab() {
         <button type="button" className="btn btn--accent" style={{ padding: '8px 16px' }} onClick={openCreate}>
           + {t('add')}
         </button>
+        <button type="button" className="btn btn--secondary" style={{ padding: '8px 16px' }} onClick={exportVehicles} disabled={exporting}>
+          {exporting ? '…' : t('export')}
+        </button>
       </div>
+      <details style={{ padding: '0 20px 12px', fontSize: 12 }}>
+        <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Supported export columns</summary>
+        <span className="muted">Plate Number, Vehicle Type, Fleet, Fleet Manager Email, Vendor Email, Tax Expiry Date, Created At.</span>
+      </details>
 
       {selected.size > 0 && (
         <div style={{ padding: '10px 20px', borderBottom: '1px solid var(--border)', background: '#fffbeb', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>

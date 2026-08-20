@@ -206,11 +206,11 @@ export function UsersTab() {
           <button type="button" className="btn btn--secondary" onClick={previewImport} disabled={!importFile || importing}>{importing ? 'Checking…' : 'Preview'}</button>
         </div>
         <details style={{ fontSize: 12 }}>
-          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Supported Excel/CSV columns</summary>
+          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Supported Excel/CSV import and export columns</summary>
           <div className="muted" style={{ paddingTop: 6, lineHeight: 1.6 }}>
             Required: <strong>Username</strong> (or <strong>Name</strong>/<strong>Name - Surname</strong> or <strong>Email</strong>), <strong>Role</strong>.<br />
             Optional: <strong>First Name</strong>, <strong>Last Name</strong>, <strong>Fleet ID</strong> (also Fleet or Service Center), <strong>Password</strong>.<br />
-            DHL workbook names are supported: <strong>Name - Surname</strong>, <strong>e-mail</strong>, <strong>Service Center</strong>. Employee ID is ignored. New users need Password. Crossed-out Excel rows are skipped.
+            Export columns: Username, First Name, Last Name, Role, Fleet ID, Created At. DHL workbook names are supported: <strong>Name - Surname</strong>, <strong>e-mail</strong>, <strong>Service Center</strong>. Employee ID is ignored. New users need Password. Crossed-out Excel rows are skipped.
           </div>
         </details>
         {importSummary && <div style={{ display: 'grid', gap: 7, fontSize: 13 }}>

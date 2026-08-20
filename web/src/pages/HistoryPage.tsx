@@ -5,6 +5,7 @@ import { useAuth } from '../AuthContext';
 import { t } from '../i18n';
 import { PhotoGrid } from '../components/PhotoGrid';
 import { formatDateThai } from '../lib/format-date';
+import { useDebounce } from '../useDebounce';
 
 type Range = 'today' | 'week' | 'month';
 
@@ -59,6 +60,11 @@ function InspectionModal({ inspection, onClose }: { inspection: InspectionDetail
               {formatDateThai(inspection.inspection_date)}
               {inspection.inspector_name ? ` • ${inspection.inspector_name}` : ''}
               {inspection.mileage ? ` • ${inspection.mileage.toLocaleString()} km` : ''}
+            </div>
+            <div style={{ color:'var(--text-secondary)', fontSize:13, marginTop:4 }}>
+              {t('fleet')}: {inspection.fleet_id || '-'}
+              {' • '}{t('vehicleType')}: {inspection.vehicle_type || '-'}
+              {' • '}{t('frequency')}: {inspection.frequency || '-'}
             </div>
           </div>
           <span className="badge badge--open">{t('failed')}</span>
@@ -130,6 +136,11 @@ export function HistoryPage() {
   const [history, setHistory] = useState<HistoryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<InspectionDetail | null>(null);
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const HISTORY_PAGE_SIZE = 50;
 
   const fleetScope = user?.role === 'admin' ? undefined : user?.fleetId;
 
@@ -139,8 +150,15 @@ export function HistoryPage() {
       setLoading(true);
       try {
         const { startDate, endDate } = getDateRange(range);
-        const data = await fetchHistory(startDate, endDate, fleetScope);
-        if (!cancelled) setHistory(data);
+        const data = await fetchHistory(startDate, endDate, fleetScope, {
+          search: debouncedSearch.trim(),
+          limit: HISTORY_PAGE_SIZE,
+          offset: 0,
+        });
+        if (!cancelled) {
+          setHistory(data);
+          setHasMore(data.inspections.length >= HISTORY_PAGE_SIZE);
+        }
       } catch {
         if (!cancelled) setHistory(null);
       } finally {
@@ -148,7 +166,29 @@ export function HistoryPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [range, fleetScope]);
+  }, [range, fleetScope, debouncedSearch]);
+
+  async function loadMore() {
+    if (!history || loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const { startDate, endDate } = getDateRange(range);
+      const data = await fetchHistory(startDate, endDate, fleetScope, {
+        search: debouncedSearch.trim(),
+        limit: HISTORY_PAGE_SIZE,
+        offset: history.inspections.length,
+      });
+      setHistory((current) => current ? {
+        ...current,
+        inspections: [...current.inspections, ...data.inspections],
+      } : data);
+      setHasMore(data.inspections.length >= HISTORY_PAGE_SIZE);
+    } catch {
+      // Keep the records already loaded; the next click can retry.
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   function selectRange(nextRange: Range) {
     setRange(nextRange);
@@ -160,7 +200,7 @@ export function HistoryPage() {
 
   // The API returns both passed and failed inspections. The log should show
   // both; the summary cards already provide the status breakdown.
-  const inspections = history?.inspections.slice(0, 20) || [];
+  const inspections = history?.inspections || [];
 
   return (
     <div className="stack">
@@ -179,6 +219,17 @@ export function HistoryPage() {
             {key === 'today' ? t('today') : key === 'week' ? t('thisWeek') : t('thisMonth')}
           </button>
         ))}
+      </div>
+
+      <div style={{ display:'flex', gap:12, alignItems:'center', flexWrap:'wrap' }}>
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={`${t('search')} ${t('plateNumber')}`}
+          aria-label={t('plateNumber')}
+          style={{ border:'1px solid var(--border)', borderRadius:8, padding:'9px 12px', minWidth:260, flex:1 }}
+        />
       </div>
 
       {loading ? (
@@ -209,8 +260,14 @@ export function HistoryPage() {
                       <div>
                         <strong>{ins.plate_number}</strong>
                         <div className="muted">
-                          {ins.inspector_name ? `${ins.inspector_name} • ` : ''}
-                          {formatDateThai(ins.inspection_date)}
+                          {t('fleet')}: {ins.fleet_id || '-'}
+                          {' • '}{t('vehicleType')}: {ins.vehicle_type || '-'}
+                          {' • '}{t('frequency')}: {ins.frequency || '-'}
+                        </div>
+                        <div className="muted">
+                          {t('date')}: {formatDateThai(ins.inspection_date)}
+                          {' • '}{t('inspector')}: {ins.inspector_name || '-'}
+                          {' • '}{t('mileage')}: {ins.mileage != null ? `${ins.mileage.toLocaleString()} km` : '-'}
                           {photoCount > 0 && (
                             <span style={{ marginLeft:8, color:'var(--brand-primary)' }}>
                               {'📷'} {photoCount}
@@ -226,6 +283,13 @@ export function HistoryPage() {
                 })
               )}
             </div>
+            {hasMore && (
+              <div style={{ padding:16, textAlign:'center' }}>
+                <button type="button" className="btn btn--secondary" onClick={loadMore} disabled={loadingMore}>
+                  {loadingMore ? t('loading') : t('loadMore')}
+                </button>
+              </div>
+            )}
           </section>
         </>
       ) : (

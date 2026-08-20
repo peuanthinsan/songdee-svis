@@ -156,6 +156,8 @@ export type InspectionDetail = {
   vehicle_id?: string;
   inspector_id?: string;
   plate_number: string;
+  vehicle_type?: VehicleTypeKey;
+  fleet_id?: string;
   overall_status: string;
   inspection_date: string;
   frequency?: 'daily' | 'weekly' | 'post_route';
@@ -209,9 +211,12 @@ export function fetchDashboard(fleetId?: string, signal?: AbortSignal) {
   return apiFetch<DashboardData>(`/api/dashboard${qs}`, { signal });
 }
 
-export function fetchHistory(startDate: string, endDate: string, fleetId?: string) {
+export function fetchHistory(startDate: string, endDate: string, fleetId?: string, options?: { search?: string; limit?: number; offset?: number }) {
   const params = new URLSearchParams({ startDate, endDate });
   if (fleetId) params.set('fleetId', fleetId);
+  if (options?.search) params.set('search', options.search);
+  if (options?.limit !== undefined) params.set('limit', String(options.limit));
+  if (options?.offset !== undefined) params.set('offset', String(options.offset));
   return apiFetch<HistoryData>(`/api/history?${params}`);
 }
 
@@ -408,6 +413,7 @@ export type MaintenanceVehicle = {
   lastTireChangeDate: string | null;
   lastTireChangeMileage: number | null;
   lastBatteryChangeDate: string | null;
+  taxExpiryDate: string | null;
   checkup: MaintenanceCategory;
   tires: MaintenanceCategory;
   battery: MaintenanceCategory;
@@ -439,10 +445,28 @@ export function saveMaintenance(data: {
   lastTireChangeDate?: string | null;
   lastTireChangeMileage?: number | null;
   lastBatteryChangeDate?: string | null;
+  taxExpiryDate?: string | null;
 }) {
   return apiFetch<{ ok: boolean }>('/api/maintenance', {
     method: 'PUT',
     body: JSON.stringify(data),
+  });
+}
+
+export function importMaintenance(rows: Array<{
+  vehicleId?: string;
+  plateNumber?: string;
+  region?: string | null;
+  lastServiceDate?: string | null;
+  lastServiceMileage?: number | string | null;
+  lastTireChangeDate?: string | null;
+  lastTireChangeMileage?: number | string | null;
+  lastBatteryChangeDate?: string | null;
+  taxExpiryDate?: string | null;
+}>) {
+  return apiFetch<{ imported: number }>('/api/admin/maintenance/import', {
+    method: 'POST',
+    body: JSON.stringify({ rows }),
   });
 }
 
@@ -513,11 +537,14 @@ export type ChecklistItem = {
 };
 
 export type AnalyticsData = {
-  topFailingVehicles: Array<{ plate_number: string; fleet_id: string; fail_count: number }>;
+  topFailingVehicles: Array<{ plate_number: string; fleet_id: string; inspection_count: number; fail_count: number; fail_rate: number; last_inspection_date: string | null; last_failed_date: string | null }>;
   topFailingItems: Array<{ item_name_th: string; item_name_en: string; fail_count: number }>;
-  fleetStats: Array<{ fleet_id: string; total: number; passed: number; failed: number }>;
+  fleetStats: Array<{ fleet_id: string; total: number; passed: number; failed: number; active_vehicles: number }>;
   dailyTrend: Array<{ date: string; passed: number; failed: number }>;
-  period: { days: number; since: string };
+  completionTrend: Array<{ date: string; inspected: number; total: number; rate: number }>;
+  resolutionTrend: Array<{ period: string; avg_hours: number; count: number }>;
+  summary: { totalInspections: number; passed: number; failed: number; passRate: number; openIssues: number; activeVehicles: number };
+  period: { days: number | null; since: string | null; until: string | null };
 };
 
 // ─── Admin API Functions ──────────────────────────────────────────────────────
@@ -658,8 +685,14 @@ export function deleteChecklistItem(id: string) {
   return apiFetch<{ deleted: boolean; retired?: boolean }>(`/api/admin/checklist?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
-export function fetchAdminAnalytics(days: 7 | 30 | 90) {
-  return apiFetch<AnalyticsData>(`/api/admin/analytics?days=${days}`);
+export function fetchAdminAnalytics(options: { days?: 7 | 30 | 90; dateStart?: string; dateEnd?: string; allTime?: boolean } = {}) {
+  const params = new URLSearchParams();
+  if (options.days) params.set('days', String(options.days));
+  if (options.dateStart) params.set('dateStart', options.dateStart);
+  if (options.dateEnd) params.set('dateEnd', options.dateEnd);
+  if (options.allTime) params.set('allTime', '1');
+  const query = params.toString();
+  return apiFetch<AnalyticsData>(`/api/admin/analytics${query ? `?${query}` : ''}`);
 }
 
 export function updateIssueStatus(id: string, status: string) {

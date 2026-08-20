@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { IssueRow, fetchIssues, updateIssueStatus } from '../../api';
+import { downloadExport, IssueRow, fetchIssues, updateIssueStatus } from '../../api';
 import { t } from '../../i18n';
 import { formatDateThai, formatDateTimeThai } from '../../lib/format-date';
 
@@ -11,6 +11,7 @@ export function IssuesMgmtTab() {
   const [filter, setFilter] = useState('open');
   const [error, setError] = useState('');
   const [updating, setUpdating] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   function load(status: string) {
     setLoading(true);
@@ -19,6 +20,13 @@ export function IssuesMgmtTab() {
       .catch(() => { setError(t('error')); setLoading(false); });
   }
   useEffect(() => load(filter), [filter]);
+
+  async function exportIssues() {
+    setExporting(true);
+    try { await downloadExport(`/api/issues/export?status=${encodeURIComponent(filter === 'all' ? '' : filter)}`, 'issues.xlsx'); }
+    catch (e: any) { setError(e.message || t('exportFailed')); }
+    finally { setExporting(false); }
+  }
 
   async function changeStatus(issue: IssueRow, newStatus: string) {
     // The dashboard does not have a completion-photo upload flow yet. Keep the
@@ -49,6 +57,7 @@ export function IssuesMgmtTab() {
     <div className="panel panel--flush">
       <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         <h2 style={{ margin: 0, flex: 1 }}>{t('adminIssuesMgmt')}</h2>
+        <button type="button" className="btn btn--secondary" onClick={() => void exportIssues()} disabled={exporting}>{exporting ? '…' : t('export')}</button>
         <div className="chip-row">
           {['all', ...STATUSES].map((s) => (
             <button key={s} type="button" className={`chip${filter === s ? ' chip--active' : ''}`} onClick={() => setFilter(s)}>
@@ -57,6 +66,7 @@ export function IssuesMgmtTab() {
           ))}
         </div>
       </div>
+      <details style={{ padding: '0 20px 12px', fontSize: 12 }}><summary style={{ cursor: 'pointer', fontWeight: 600 }}>Supported export columns</summary><span className="muted">Plate Number, Fleet, Vehicle Type, Status, Inspector, Inspection Date, Created, Defect 1–3, Repair 1–3.</span></details>
       {error && <div className="alert alert--error" style={{ margin: 12 }}>{error}</div>}
       {loading ? (
         <p className="muted" style={{ padding: 20 }}>{t('loading')}</p>

@@ -46,6 +46,15 @@ function addDays(dateStr: string, days: number): string {
   return date.toISOString().split('T')[0];
 }
 
+// Neon may return PostgreSQL DATE columns as Date objects in serverless
+// runtimes. Normalize them before applying the date-based maintenance rules.
+function dateOnly(value: unknown): string | null {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString().split('T')[0];
+  if (typeof value === 'string') return value.slice(0, 10);
+  return null;
+}
+
 function worst(a: CategoryStatus, b: CategoryStatus): CategoryStatus {
   const order: CategoryStatus[] = ['overdue', 'due', 'ok', 'noData'];
   return order[Math.min(order.indexOf(a), order.indexOf(b))];
@@ -87,6 +96,7 @@ async function handleGet(req: VercelRequest, res: VercelResponse, user: AuthUser
   try {
     const rows = await sql`
       SELECT v.id, v.plate_number, v.fleet_id, v.vehicle_type, v.region,
+        v.tax_expiry_date,
         m.last_service_date, m.last_service_mileage,
         m.last_tire_change_date, m.last_tire_change_mileage,
         m.last_battery_change_date,
@@ -116,15 +126,21 @@ async function handleGet(req: VercelRequest, res: VercelResponse, user: AuthUser
 
     const vehicles = (rows as any[]).map((r) => {
       const latestKm: number | null = r.latest_mileage ?? null;
+      const latestDate = dateOnly(r.latest_date);
+      const earliestDate = dateOnly(r.earliest_date);
+      const lastServiceDate = dateOnly(r.last_service_date);
+      const lastTireChangeDate = dateOnly(r.last_tire_change_date);
+      const lastBatteryChangeDate = dateOnly(r.last_battery_change_date);
+      const taxExpiryDate = dateOnly(r.tax_expiry_date);
 
       // Average daily usage from the mileage recorded on inspections.
       let kmPerDay: number | null = null;
       if (
         r.earliest_mileage !== null && r.latest_mileage !== null &&
-        r.earliest_date && r.latest_date && r.earliest_date !== r.latest_date
+        earliestDate && latestDate && earliestDate !== latestDate
       ) {
         const spanDays =
-          (Date.parse(r.latest_date) - Date.parse(r.earliest_date)) / 86_400_000;
+          (Date.parse(latestDate) - Date.parse(earliestDate)) / 86_400_000;
         const kmDiff = r.latest_mileage - r.earliest_mileage;
         if (spanDays >= MIN_USAGE_SPAN_DAYS && kmDiff >= 0) {
           kmPerDay = kmDiff / spanDays;
@@ -136,7 +152,7 @@ async function handleGet(req: VercelRequest, res: VercelResponse, user: AuthUser
 
       // Tires: km rule OR 2-year rule, whichever comes first.
       const tiresKm = mileageRule(r.last_tire_change_mileage, TIRE_INTERVAL_KM[region], latestKm, kmPerDay);
-      const tiresDate = dateRule(r.last_tire_change_date, TIRE_INTERVAL_MONTHS, today);
+      const tiresDate = dateRule(lastTireChangeDate, TIRE_INTERVAL_MONTHS, today);
       const tires: Category = {
         status: worst(tiresKm.status, tiresDate.status),
         dueAtKm: tiresKm.dueAtKm,
@@ -144,7 +160,7 @@ async function handleGet(req: VercelRequest, res: VercelResponse, user: AuthUser
         dueDate: tiresDate.dueDate,
       };
 
-      const battery = dateRule(r.last_battery_change_date, BATTERY_INTERVAL_MONTHS, today);
+      const battery = dateRule(lastBatteryChangeDate, BATTERY_INTERVAL_MONTHS, today);
 
       return {
         vehicleId: r.id,
@@ -154,11 +170,12 @@ async function handleGet(req: VercelRequest, res: VercelResponse, user: AuthUser
         region,
         latestMileage: latestKm,
         kmPerDay: kmPerDay === null ? null : Math.round(kmPerDay),
-        lastServiceDate: r.last_service_date ?? null,
+        lastServiceDate,
         lastServiceMileage: r.last_service_mileage ?? null,
-        lastTireChangeDate: r.last_tire_change_date ?? null,
+        lastTireChangeDate,
         lastTireChangeMileage: r.last_tire_change_mileage ?? null,
-        lastBatteryChangeDate: r.last_battery_change_date ?? null,
+        lastBatteryChangeDate,
+        taxExpiryDate,
         checkup,
         tires,
         battery,
@@ -195,6 +212,7 @@ async function handlePut(req: VercelRequest, res: VercelResponse, user: AuthUser
     lastServiceDate, lastServiceMileage,
     lastTireChangeDate, lastTireChangeMileage,
     lastBatteryChangeDate,
+    taxExpiryDate,
   } = req.body;
 
   if (!vehicleId) return res.status(400).json({ error: 'vehicleId is required' });
@@ -216,6 +234,12 @@ async function handlePut(req: VercelRequest, res: VercelResponse, user: AuthUser
     if (region !== undefined) {
       await sql`
         UPDATE vehicle_master SET region = ${region}
+        WHERE id = ${vehicleId} AND company_id = ${user.companyId}
+      `;
+    }
+    if (taxExpiryDate !== undefined) {
+      await sql`
+        UPDATE vehicle_master SET tax_expiry_date = ${asDate(taxExpiryDate)}
         WHERE id = ${vehicleId} AND company_id = ${user.companyId}
       `;
     }

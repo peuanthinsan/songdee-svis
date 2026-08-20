@@ -186,8 +186,12 @@ async function handlePut(req: VercelRequest, res: VercelResponse, user: AuthUser
       return res.status(404).json({ error: 'Inspection not found' });
     }
 
-    // Only original inspector or admin can edit
-    if (user.role !== 'admin' && user.userId !== existing.inspector_id) {
+    // Supervisors may complete or correct inspections for their own fleet;
+    // drivers remain limited to inspections they originally submitted.
+    const canEdit = user.role === 'admin'
+      || (user.role === 'supervisor' && existing.fleet_id === user.fleetId)
+      || user.userId === existing.inspector_id;
+    if (!canEdit) {
       return res.status(403).json({ error: 'Not authorized to edit this inspection' });
     }
 

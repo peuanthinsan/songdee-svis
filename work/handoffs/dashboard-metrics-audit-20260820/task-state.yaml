@@ -1,0 +1,14 @@
+task_id: dashboard-metrics-audit-20260820
+active_root: codex
+delegated_provider: claude
+phase: verified
+requested_lane: plan-and-review
+observed_model: UNKNOWN
+observed_effort: UNKNOWN
+base_ref: b0b52faf4cb087d72920d1cc6c8892b1c2c16ecd
+writer_lease: active_root
+status: complete
+review_status: opposite_provider_unavailable
+verification: typecheck-tests-dashboard-build-diff-check-pass
+external_mutations: prohibited
+user_wip_primary_checkout: preserved

@@ -24,10 +24,26 @@ const TABS: { id: AdminTab; key: 'adminSettings' | 'adminUsers' | 'adminVehicles
   { id: 'maintenance', key: 'adminMaintenance' },
 ];
 
+const ADMIN_TAB_STORAGE_KEY = 'svis_admin_active_tab';
+const adminTabIds = new Set<AdminTab>(TABS.map((item) => item.id));
+
+function savedAdminTab(): AdminTab {
+  try {
+    const value = localStorage.getItem(ADMIN_TAB_STORAGE_KEY) as AdminTab | null;
+    return value && adminTabIds.has(value) ? value : 'settings';
+  } catch {
+    return 'settings';
+  }
+}
+
 export function AdminPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<AdminTab>('settings');
+  const [tab, setTab] = useState<AdminTab>(savedAdminTab);
+
+  useEffect(() => {
+    try { localStorage.setItem(ADMIN_TAB_STORAGE_KEY, tab); } catch { /* storage may be unavailable */ }
+  }, [tab]);
 
   useEffect(() => {
     if (user && user.role !== 'admin') navigate('/', { replace: true });

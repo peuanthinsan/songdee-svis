@@ -18,6 +18,7 @@ import {
 } from '../../checklist-groups';
 import { getLang, t } from '../../i18n';
 import { ChecklistImportDialog } from './ChecklistImportDialog';
+import { downloadCsv } from '../../data-export';
 
 type VehicleType = ChecklistItem['vehicle_type'];
 type Form = { itemNameTh: string; itemNameEn: string; vehicleType: VehicleType; frequency: ChecklistFrequency; sortOrder: string };
@@ -69,6 +70,10 @@ export function ChecklistTab() {
   const navigate = useNavigate();
   const { signOut } = useAuth();
   const lang = getLang();
+
+  function exportChecklist() {
+    downloadCsv('checklist.csv', ['item_name_th', 'item_name_en', 'frequency', 'vehicle_type', 'sort_order'], items.map((item) => [item.item_name_th, item.item_name_en, item.frequency, item.vehicle_type, item.sort_order]));
+  }
 
   const load = useCallback(async () => {
     const requestId = ++loadRequestRef.current;
@@ -266,6 +271,7 @@ export function ChecklistTab() {
           <button type="button" className="btn btn--secondary checklist-manager__button" onClick={() => setImportOpen(true)} disabled={loading}>
             <UploadIcon /> {t('importFile')}
           </button>
+          <button type="button" className="btn btn--secondary checklist-manager__button" onClick={exportChecklist} disabled={loading || items.length === 0}>{t('export')}</button>
           <button type="button" className="btn btn--accent checklist-manager__button" onClick={openCreate} disabled={loading}>
             <span aria-hidden="true">+</span> {t('addItem')}
           </button>

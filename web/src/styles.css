@@ -423,6 +423,52 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .maintenance-card__count { font-size: 25px; line-height: 1; font-weight: 800; }
 .maintenance-card__meta { color: var(--text-secondary); font-size: 11px; margin-top: 9px; }
 .maintenance-card__overdue { color: var(--status-fail); font-weight: 750; }
+.maintenance-vehicle-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 16px 20px 20px; }
+.maintenance-vehicle-card { border: 1px solid var(--border); border-radius: 12px; padding: 16px; background: var(--surface); }
+.maintenance-vehicle-card__header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.maintenance-vehicle-card__header strong { font-size: 16px; }
+.maintenance-vehicle-card__summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+.maintenance-vehicle-card__summary div { display: grid; gap: 3px; }
+.maintenance-vehicle-card__summary span { color: var(--text-secondary); font-size: 11px; }
+.maintenance-vehicle-card__summary strong { font-size: 13px; font-weight: 700; }
+.maintenance-vehicle-card__statuses { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.maintenance-vehicle-card__statuses span { border-radius: 999px; background: var(--surface-subtle); color: var(--text-secondary); padding: 5px 8px; font-size: 11px; }
+.maintenance-toolbar { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.maintenance-filter-bar { display: grid; grid-template-columns: repeat(4, minmax(130px, 1fr)) minmax(70px, auto); gap: 8px; align-items: center; padding: 12px 20px; border-bottom: 1px solid var(--border); background: var(--surface-subtle); }
+.maintenance-result-count { color: var(--text-secondary); font-size: 12px; white-space: nowrap; text-align: right; }
+.maintenance-table-scroll { overflow-x: auto; }
+.maintenance-table { min-width: 1180px; }
+.maintenance-table th button { border: 0; background: transparent; padding: 0; color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; }
+.maintenance-status { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 8px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.maintenance-status--danger { color: var(--status-fail); background: #fff1f1; }
+.maintenance-status--warning { color: #9a6700; background: #fff8dc; }
+.maintenance-status--muted { color: var(--text-secondary); background: var(--surface-subtle); }
+.maintenance-status--ok { color: var(--status-pass); background: #edf9f1; }
+.maintenance-editor-tabs { display: flex; gap: 4px; padding: 0 22px; border-bottom: 1px solid var(--border); overflow-x: auto; }
+.maintenance-editor-tab { border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--text-secondary); padding: 12px 10px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.maintenance-editor-tab--active { color: var(--brand-primary); border-bottom-color: var(--brand-primary); }
+.maintenance-editor-callout { display: grid; gap: 6px; padding: 12px; border-radius: 10px; background: var(--surface-subtle); }
+.maintenance-contract { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-subtle); }
+.maintenance-contract > strong { font-size: 12px; }
+.maintenance-contract__facts { display: flex; flex-wrap: wrap; gap: 12px; color: var(--text-secondary); font-size: 12px; }
+.maintenance-editor-help { color: var(--text-secondary); font-size: 11px; font-weight: 500; }
+.maintenance-editor-overlay { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px; background: rgba(15, 23, 42, 0.48); }
+.maintenance-editor-modal { width: min(680px, 100%); max-height: min(760px, 92vh); overflow: auto; background: var(--surface); border-radius: 16px; box-shadow: 0 24px 80px rgba(15, 23, 42, 0.28); }
+.maintenance-editor-modal__header, .maintenance-editor-modal__footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 18px 22px; border-bottom: 1px solid var(--border); }
+.maintenance-editor-modal__footer { justify-content: flex-end; border-top: 1px solid var(--border); border-bottom: 0; }
+.maintenance-editor-modal__body { display: grid; gap: 18px; padding: 22px; }
+.maintenance-editor-section { display: grid; gap: 10px; padding-top: 2px; }
+.maintenance-editor-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.maintenance-editor-field { display: grid; gap: 5px; color: var(--text-secondary); font-size: 12px; font-weight: 700; }
+@media (max-width: 760px) {
+  .maintenance-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .maintenance-vehicle-grid { grid-template-columns: 1fr; padding: 12px; }
+  .maintenance-filter-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px; }
+  .maintenance-result-count { text-align: left; }
+}
+@media (max-width: 520px) {
+  .maintenance-grid, .maintenance-editor-fields, .maintenance-vehicle-card__summary { grid-template-columns: 1fr; }
+}
 
 .admin-tabs { padding: 0; overflow: hidden; }
 .admin-tabs__list { display: flex; gap: 2px; padding: 0 10px; overflow-x: auto; border-bottom: 1px solid var(--border); scrollbar-width: none; }

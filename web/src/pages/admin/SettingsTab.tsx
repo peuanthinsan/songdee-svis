@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchAdminSettings, saveAdminSetting } from '../../api';
 import { t } from '../../i18n';
+import { downloadCsv } from '../../data-export';
 
 export function SettingsTab() {
   const [url, setUrl] = useState('');
@@ -28,6 +29,8 @@ export function SettingsTab() {
     }
   }
 
+  function exportSettings() { downloadCsv('settings.csv', ['setting', 'value'], [['unit_status_sheet_url', url]]); }
+
   return (
     <div className="panel">
       <h2 style={{ marginBottom: 20 }}>{t('adminSettings')}</h2>
@@ -49,10 +52,12 @@ export function SettingsTab() {
           {error && <div className="alert alert--error">{error}</div>}
           {saved && <div className="alert" style={{ background: '#e8f5e9', color: '#2e7d32' }}>{t('saved')} ✓</div>}
           <div>
+            <button type="button" className="btn btn--secondary" onClick={exportSettings} style={{ marginRight: 8 }}>{t('export')}</button>
             <button type="button" className="btn btn--accent" onClick={handleSave} disabled={saving}>
               {saving ? t('saving') : t('save')}
             </button>
           </div>
+          <details style={{ fontSize: 12 }}><summary style={{ cursor: 'pointer', fontWeight: 600 }}>Supported export columns</summary><span className="muted">Setting, Value.</span></details>
         </div>
       )}
     </div>
