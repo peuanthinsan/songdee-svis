@@ -21,6 +21,13 @@ test('dashboard issue and defect counts exclude inactive vehicles', () => {
   assert.ok(defectQuery?.[0].includes('vm.is_active'));
 });
 
+test('dashboard issue counts qualify created_at after joining vehicle data', () => {
+  const issueQuery = dashboard.match(/Vehicles with a defect = distinct vehicles[\s\S]*?\n      `,/);
+
+  assert.ok(issueQuery?.[0].includes('ir.created_at AT TIME ZONE'));
+  assert.ok(!issueQuery?.[0].includes('WHERE (created_at AT TIME ZONE'));
+});
+
 test('admin analytics uses active vehicles for trend denominators and numerator joins', () => {
   assert.match(analytics, /FROM vehicle_master\n      WHERE company_id = \$\{admin\.companyId\} AND is_active/);
   assert.match(analytics, /JOIN vehicle_master vm ON vm\.id = il\.vehicle_id AND vm\.is_active/);
