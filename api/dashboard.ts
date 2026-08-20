@@ -55,7 +55,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const [vehicleRows, inspectedRows, weeklyInspectedRows, oosRows, issueCount, defectRows, fleetTotals, fleetChecked, sheetVehicles] = await Promise.all([
       // All vehicles in scope (composition + plate matching against the GPS sheet).
       sql`
-        SELECT id, plate_number, vehicle_type, fleet_id
+        SELECT id, plate_number, vehicle_type, fleet_id, tax_expiry_date
         FROM vehicle_master
         WHERE company_id = ${user.companyId}
           AND (${fleet}::text IS NULL OR fleet_id = ${fleet})
@@ -69,6 +69,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         WHERE i.inspection_date = ${today}
           AND i.company_id = ${user.companyId}
           AND i.frequency IN ('daily', 'post_route')
+          AND v.is_active
           AND (${fleet}::text IS NULL OR v.fleet_id = ${fleet})
       `,
       // Vehicles with a weekly inspection this week (Monday..today, Bangkok).
@@ -80,6 +81,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           AND i.company_id = ${user.companyId}
           AND i.inspection_date >= ${monday}
           AND i.inspection_date <= ${today}
+          AND v.is_active
           AND (${fleet}::text IS NULL OR v.fleet_id = ${fleet})
       `,
       // Out of service: vehicles whose most recent answered "vehicle usable?" is No.
@@ -94,6 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           JOIN vehicle_master v ON v.id = il.vehicle_id
           WHERE il.vehicle_usable IS NOT NULL
             AND il.company_id = ${user.companyId}
+            AND v.is_active
             AND (${fleet}::text IS NULL OR v.fleet_id = ${fleet})
           ORDER BY il.vehicle_id, il.inspection_date DESC, il.created_at DESC
         ) latest
@@ -106,10 +109,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           (COUNT(DISTINCT vehicle_id) FILTER (
             WHERE (created_at AT TIME ZONE 'Asia/Bangkok')::date = ${today}::date
           ))::int AS today
-        FROM issue_reports
-        WHERE status IN ('open', 'in_progress')
-          AND company_id = ${user.companyId}
-          AND (${fleet}::text IS NULL OR fleet_id = ${fleet})
+        FROM issue_reports ir
+        JOIN vehicle_master vm ON vm.id = ir.vehicle_id AND vm.is_active
+        WHERE ir.status IN ('open', 'in_progress')
+          AND ir.company_id = ${user.companyId}
+          AND (${fleet}::text IS NULL OR ir.fleet_id = ${fleet})
       `,
       // Defect vehicle list (drives the Notify-vendor rows).
       sql`
@@ -118,7 +122,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ir.vendor_notified_at,
           (vm.vendor_email IS NOT NULL AND vm.vendor_email != '') AS has_vendor_email
         FROM issue_reports ir
-        JOIN vehicle_master vm ON vm.id = ir.vehicle_id
+        JOIN vehicle_master vm ON vm.id = ir.vehicle_id AND vm.is_active
         WHERE ir.status IN ('open', 'in_progress')
           AND ir.company_id = ${user.companyId}
           AND (${fleet}::text IS NULL OR ir.fleet_id = ${fleet})
@@ -141,6 +145,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         JOIN vehicle_master v ON v.id = i.vehicle_id
         WHERE i.inspection_date = ${today} AND i.frequency = 'daily'
           AND i.company_id = ${user.companyId}
+          AND v.is_active
           AND (${fleet}::text IS NULL OR v.fleet_id = ${fleet})
         GROUP BY v.fleet_id
       `,
@@ -321,6 +326,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         })),
       },
       fleets,
+      vehicleTax: (vehicleRows as any[])
+        .filter((v) => v.tax_expiry_date)
+        .map((v) => ({
+          vehicleId: v.id,
+          plate: v.plate_number,
+          fleetId: v.fleet_id,
+          expiryDate: v.tax_expiry_date,
+        }))
+        .sort((a, b) => String(a.expiryDate).localeCompare(String(b.expiryDate))),
       // Back-compat alias (= pre-departure / daily completion).
       overall: {
         total: preDeparture.total,

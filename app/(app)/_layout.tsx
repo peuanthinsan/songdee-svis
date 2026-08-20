@@ -4,11 +4,13 @@ import { useRole } from '../../lib/useRole';
 import { useCompanyTheme } from '../../lib/use-company-theme';
 import { density } from '../../constants/theme';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function AppLayout() {
   const { t } = useI18n();
   const { isDriver, isAdmin } = useRole();
   const colors = useCompanyTheme();
+  const insets = useSafeAreaInsets();
 
   return (
     <Tabs
@@ -21,9 +23,12 @@ export default function AppLayout() {
           backgroundColor: colors.white,
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          height: density.tabBarHeight,
+          // edgeToEdgeEnabled lets Android draw behind the navigation bar, so
+          // reserve the bottom inset explicitly instead of letting system
+          // buttons cover the tab labels.
+          height: density.tabBarHeight + insets.bottom,
           paddingTop: 4,
-          paddingBottom: 10,
+          paddingBottom: 10 + insets.bottom,
         },
         tabBarItemStyle: { paddingVertical: 2 },
         tabBarLabelStyle: { fontSize: 10, fontWeight: '600', marginTop: 1 },

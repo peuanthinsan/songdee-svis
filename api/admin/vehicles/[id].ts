@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { neon } from '@neondatabase/serverless';
 import { requireAdmin } from '../../../lib/admin-auth';
+import { isDateString } from '../../../lib/validate';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const admin = await requireAdmin(req, res);
@@ -14,10 +15,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const sql = neon(process.env.DATABASE_URL!);
 
   if (req.method === 'PUT') {
-    const { plateNumber, vehicleType, fleetId, fleetManagerEmail, vendorEmail } = req.body;
+    const { plateNumber, vehicleType, fleetId, fleetManagerEmail, vendorEmail, taxExpiryDate } = req.body;
     if (vehicleType && !['car', 'van', 'e_van', 'motorcycle', 'e_bike'].includes(vehicleType)) {
       return res.status(400).json({ error: 'Invalid vehicle type' });
     }
+    if (taxExpiryDate !== undefined && taxExpiryDate !== null && !isDateString(taxExpiryDate)) {
+      return res.status(400).json({ error: 'Invalid tax expiry date' });
+    }
+    const hasTaxExpiryDate = Object.prototype.hasOwnProperty.call(req.body, 'taxExpiryDate');
     try {
       const [vehicle] = await sql`
         UPDATE vehicle_master SET
@@ -26,8 +31,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           fleet_id = COALESCE(${fleetId || null}, fleet_id),
           fleet_manager_email = COALESCE(${fleetManagerEmail ?? null}, fleet_manager_email),
           vendor_email = COALESCE(${vendorEmail ?? null}, vendor_email)
+          ,tax_expiry_date = CASE WHEN ${hasTaxExpiryDate} THEN ${taxExpiryDate || null}::date ELSE tax_expiry_date END
         WHERE id = ${id} AND company_id = ${admin.companyId}
-        RETURNING id, plate_number, vehicle_type, fleet_id, fleet_manager_email, vendor_email
+        RETURNING id, plate_number, vehicle_type, fleet_id, fleet_manager_email, vendor_email, tax_expiry_date
       `;
       if (!vehicle) return res.status(404).json({ error: 'Vehicle not found' });
       return res.status(200).json(vehicle);
