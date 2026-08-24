@@ -9,11 +9,7 @@ export const CHECKLIST_FREQUENCIES: readonly ChecklistFrequency[] = [
 ];
 
 export const CHECKLIST_VEHICLE_TYPES: readonly VehicleTypeKey[] = [
-  'car',
-  'van',
-  'e_van',
-  'motorcycle',
-  'e_bike',
+  'car', 'van', 'e_van', 'motorcycle', 'e_bike', 'light_truck', 'six_wheel_truck',
 ];
 
 export type ChecklistFrequencyGroup = {

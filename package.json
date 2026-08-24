@@ -10,6 +10,7 @@
     "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/*.test.mjs",
     "typecheck": "tsc --noEmit",
     "migrate:020": "node scripts/migrate-020.js",
+    "migrate:023": "node scripts/migrate-023.js",
     "migrate:021": "node scripts/migrate-021.js",
     "build:dashboard": "cd web && npm install && npm run build",
     "dev:dashboard": "cd web && npm install && npm run dev"

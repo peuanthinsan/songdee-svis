@@ -170,7 +170,7 @@ export function VehiclesTab() {
     }
   }
 
-  const typeLabel: Record<string, string> = { car: t('car'), van: t('van'), e_van: t('eVan'), motorcycle: t('motorcycle'), e_bike: t('eBike') };
+  const typeLabel: Record<string, string> = { car: t('car'), van: t('van'), e_van: t('eVan'), motorcycle: t('motorcycle'), e_bike: t('eBike'), light_truck: t('lightTruck'), six_wheel_truck: t('sixWheelTruck') };
   const allLoadedSelected = vehicles.length > 0 && vehicles.every((v) => selected.has(v.id));
 
   function toggleAll() {
@@ -332,6 +332,8 @@ export function VehiclesTab() {
                 <option value="e_van">{t('eVan')}</option>
                 <option value="motorcycle">{t('motorcycle')}</option>
                 <option value="e_bike">{t('eBike')}</option>
+                <option value="light_truck">{t('lightTruck')}</option>
+                <option value="six_wheel_truck">{t('sixWheelTruck')}</option>
               </select>
             </label>
             <label style={{ display: 'grid', gap: 4, fontSize: 13, fontWeight: 600 }}>

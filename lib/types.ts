@@ -1,6 +1,10 @@
 import type { TranslationKey } from './i18n';
 
-export type VehicleType = 'car' | 'van' | 'e_van' | 'motorcycle' | 'e_bike';
+export type VehicleType = 'car' | 'van' | 'e_van' | 'motorcycle' | 'e_bike' | 'light_truck' | 'six_wheel_truck';
+
+export const VEHICLE_TYPES: readonly VehicleType[] = [
+  'car', 'van', 'e_van', 'motorcycle', 'e_bike', 'light_truck', 'six_wheel_truck',
+];
 
 export type Company = {
   slug: string;
@@ -17,11 +21,13 @@ export type LoginAccount = {
 };
 
 export const VEHICLE_TYPE_LABELS: Record<VehicleType, string> = {
-  car: 'Car',
+  car: 'Pickup',
   van: 'Van',
   e_van: 'E-Van',
   motorcycle: 'Motorcycle',
   e_bike: 'E-Bike',
+  light_truck: 'Light Truck',
+  six_wheel_truck: '6-Wheel Truck',
 };
 
 export const VEHICLE_TYPE_I18N_KEYS: Record<VehicleType, TranslationKey> = {
@@ -30,6 +36,8 @@ export const VEHICLE_TYPE_I18N_KEYS: Record<VehicleType, TranslationKey> = {
   e_van: 'inspection.vehicleTypeEvan',
   motorcycle: 'inspection.vehicleTypeMotorcycle',
   e_bike: 'inspection.vehicleTypeEbike',
+  light_truck: 'inspection.vehicleTypeLightTruck',
+  six_wheel_truck: 'inspection.vehicleTypeSixWheelTruck',
 };
 
 export function vehicleTypeLabel(vehicleType: string): string {

@@ -64,7 +64,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (Array.isArray(req.body?.rows)) {
       const rows = req.body.rows as Array<Record<string, unknown>>;
       if (rows.length === 0 || rows.length > 1000) return res.status(400).json({ error: 'Import must contain 1 to 1000 rows' });
-      const validTypes = ['car', 'van', 'e_van', 'motorcycle', 'e_bike'];
+      const validTypes = ['car', 'van', 'e_van', 'motorcycle', 'e_bike', 'light_truck', 'six_wheel_truck'];
       const errors: string[] = [];
       rows.forEach((row, index) => {
         if (!row.plateNumber || !row.vehicleType || !row.fleetId) errors.push(`Row ${index + 1}: Plate Number, Vehicle Type and Fleet are required`);
@@ -101,7 +101,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!plateNumber || !vehicleType || !fleetId) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
-    const VALID_TYPES = ['car', 'van', 'e_van', 'motorcycle', 'e_bike'];
+    const VALID_TYPES = ['car', 'van', 'e_van', 'motorcycle', 'e_bike', 'light_truck', 'six_wheel_truck'];
     if (!VALID_TYPES.includes(vehicleType)) {
       return res.status(400).json({ error: 'Invalid vehicle type' });
     }
