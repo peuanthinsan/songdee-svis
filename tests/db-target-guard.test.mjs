@@ -221,6 +221,7 @@ const CLASS_A_SCRIPTS = [
   'migrate-017.js',
   'migrate-018.js',
   'migrate-019.js',
+  'migrate-023.js',
   'run-sql.js',
 ];
 
