@@ -20,7 +20,7 @@ import { colors, spacing, borderRadius, shadows } from '../../../constants/theme
 import { useI18n } from '../../../lib/i18n-context';
 import { apiFetch } from '../../../lib/api';
 import { useDebounce } from '../../../lib/useDebounce';
-import { type VehicleType, VEHICLE_TYPE_LABELS } from '../../../lib/types';
+import { type VehicleType, VEHICLE_TYPE_LABELS, VEHICLE_TYPES } from '../../../lib/types';
 
 type Vehicle = {
   id: string;
@@ -47,6 +47,8 @@ const VEHICLE_TYPE_ICONS: Record<VehicleType, React.ComponentProps<typeof Ionico
   e_van: 'bus-outline',
   motorcycle: 'bicycle-outline',
   e_bike: 'bicycle-outline',
+  light_truck: 'bus-outline',
+  six_wheel_truck: 'bus-outline',
 };
 
 const EMPTY_FORM: FormState = {
@@ -496,7 +498,7 @@ export default function AdminVehiclesScreen() {
               {/* Vehicle type picker */}
               <Text style={styles.fieldLabel}>{t('admin.vehicles.vehicleType')}</Text>
               <View style={styles.typePicker}>
-                {(['car', 'van', 'e_van', 'motorcycle', 'e_bike'] as VehicleType[]).map((vt) => (
+                {VEHICLE_TYPES.map((vt) => (
                   <TouchableOpacity
                     key={vt}
                     style={[

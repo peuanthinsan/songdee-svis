@@ -86,13 +86,18 @@ export type FleetStat = {
   pending: number;
 };
 
-export type VehicleTypeKey = 'car' | 'van' | 'e_van' | 'motorcycle' | 'e_bike';
+export type VehicleTypeKey = 'car' | 'van' | 'e_van' | 'motorcycle' | 'e_bike' | 'light_truck' | 'six_wheel_truck';
+export const VEHICLE_TYPES: readonly VehicleTypeKey[] = [
+  'car', 'van', 'e_van', 'motorcycle', 'e_bike', 'light_truck', 'six_wheel_truck',
+];
 export const VEHICLE_TYPE_LABELS: Record<VehicleTypeKey, string> = {
-  car: 'Car',
+  car: 'Pickup',
   van: 'Van',
   e_van: 'E-Van',
   motorcycle: 'Motorcycle',
   e_bike: 'E-Bike',
+  light_truck: 'Light Truck',
+  six_wheel_truck: '6-Wheel Truck',
 };
 export const VEHICLE_TYPE_I18N_KEYS: Record<VehicleTypeKey, string> = {
   car: 'typeCar',
@@ -100,6 +105,8 @@ export const VEHICLE_TYPE_I18N_KEYS: Record<VehicleTypeKey, string> = {
   e_van: 'typeEvan',
   motorcycle: 'typeMotorcycle',
   e_bike: 'typeEbike',
+  light_truck: 'typeLightTruck',
+  six_wheel_truck: 'typeSixWheelTruck',
 };
 export type TypeBreakdown = Record<VehicleTypeKey, number>;
 

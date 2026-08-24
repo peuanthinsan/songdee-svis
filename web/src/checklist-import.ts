@@ -60,6 +60,7 @@ const FREQUENCY_ALIASES: Record<string, ChecklistFrequency> = {
 
 const VEHICLE_TYPE_ALIASES: Record<string, VehicleTypeKey> = {
   car: 'car',
+  pickup: 'car',
   'รถยนต์': 'car',
   van: 'van',
   'แวน': 'van',
@@ -75,6 +76,13 @@ const VEHICLE_TYPE_ALIASES: Record<string, VehicleTypeKey> = {
   ebike: 'e_bike',
   electric_bike: 'e_bike',
   'จักรยานยนต์ไฟฟ้า': 'e_bike',
+  light_truck: 'light_truck',
+  lighttruck: 'light_truck',
+  'light truck': 'light_truck',
+  six_wheel_truck: 'six_wheel_truck',
+  sixwheeltruck: 'six_wheel_truck',
+  '6_wheel_truck': 'six_wheel_truck',
+  '6-wheel truck': 'six_wheel_truck',
 };
 
 function normalizeToken(value: string) {

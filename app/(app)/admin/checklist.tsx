@@ -18,7 +18,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { colors, spacing, borderRadius, shadows } from '../../../constants/theme';
 import { useI18n } from '../../../lib/i18n-context';
 import { apiFetch } from '../../../lib/api';
-import { type VehicleType, VEHICLE_TYPE_I18N_KEYS } from '../../../lib/types';
+import { type VehicleType, VEHICLE_TYPE_I18N_KEYS, VEHICLE_TYPES } from '../../../lib/types';
 
 type Frequency = 'daily' | 'weekly' | 'post_route';
 
@@ -47,7 +47,6 @@ const EMPTY_FORM: FormState = {
   sortOrder: '1',
 };
 
-const VEHICLE_TYPES: VehicleType[] = ['car', 'van', 'e_van', 'motorcycle', 'e_bike'];
 const FREQUENCIES: Frequency[] = ['daily', 'weekly', 'post_route'];
 
 function vehicleTypeLabel(t: (key: any) => string, vehicleType: VehicleType): string {

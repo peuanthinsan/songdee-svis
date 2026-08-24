@@ -1,7 +1,7 @@
 export const CHECKLIST_IMPORT_LIMIT = 1000;
 
 const VALID_FREQUENCIES = new Set(['daily', 'weekly', 'post_route']);
-const VALID_VEHICLE_TYPES = new Set(['car', 'van', 'e_van', 'motorcycle', 'e_bike']);
+const VALID_VEHICLE_TYPES = new Set(['car', 'van', 'e_van', 'motorcycle', 'e_bike', 'light_truck', 'six_wheel_truck']);
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export class ChecklistInputError extends Error {}

@@ -376,7 +376,7 @@ function MaintenanceFocusList({
   );
 }
 
-const TYPE_ORDER: VehicleTypeKey[] = ['car', 'van', 'e_van', 'motorcycle', 'e_bike'];
+const TYPE_ORDER: VehicleTypeKey[] = ['car', 'van', 'e_van', 'motorcycle', 'e_bike', 'light_truck', 'six_wheel_truck'];
 
 const TYPE_COLOR: Record<VehicleTypeKey, string> = {
   car: '#2563eb',
@@ -384,6 +384,8 @@ const TYPE_COLOR: Record<VehicleTypeKey, string> = {
   e_van: '#16a34a',
   motorcycle: '#7c3aed',
   e_bike: '#0891b2',
+  light_truck: '#b45309',
+  six_wheel_truck: '#be123c',
 };
 
 function typeLabel(k: VehicleTypeKey): string {

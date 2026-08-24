@@ -154,7 +154,7 @@ export function ChecklistTab() {
     }
   }
 
-  const typeLabel: Record<VehicleType, string> = { car: t('car'), van: t('van'), e_van: t('eVan'), motorcycle: t('motorcycle'), e_bike: t('eBike') };
+  const typeLabel: Record<VehicleType, string> = { car: t('car'), van: t('van'), e_van: t('eVan'), motorcycle: t('motorcycle'), e_bike: t('eBike'), light_truck: t('lightTruck'), six_wheel_truck: t('sixWheelTruck') };
   const freqLabel: Record<ChecklistFrequency, string> = { daily: t('daily'), weekly: t('weekly'), post_route: t('postRoute') };
   const groupedItems = useMemo(
     () => groupChecklistItems(items, { search }),

@@ -4,11 +4,11 @@ import { verifyAuth } from '../lib/api-auth';
 import { getTodayThai, getMondayOfWeekThai } from '../lib/thai-date';
 import { fetchSheetVehicles, recordVehicleActivity, type SheetVehicle } from '../lib/unit-status-sheet';
 
-type TypeKey = 'car' | 'van' | 'e_van' | 'motorcycle' | 'e_bike';
-const TYPE_KEYS: TypeKey[] = ['car', 'van', 'e_van', 'motorcycle', 'e_bike'];
+type TypeKey = 'car' | 'van' | 'e_van' | 'motorcycle' | 'e_bike' | 'light_truck' | 'six_wheel_truck';
+const TYPE_KEYS: TypeKey[] = ['car', 'van', 'e_van', 'motorcycle', 'e_bike', 'light_truck', 'six_wheel_truck'];
 
 function emptyTypes(): Record<TypeKey, number> {
-  return { car: 0, van: 0, e_van: 0, motorcycle: 0, e_bike: 0 };
+  return { car: 0, van: 0, e_van: 0, motorcycle: 0, e_bike: 0, light_truck: 0, six_wheel_truck: 0 };
 }
 function sumTypes(b: Record<TypeKey, number>): number {
   return TYPE_KEYS.reduce((s, k) => s + b[k], 0);

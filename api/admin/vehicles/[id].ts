@@ -16,7 +16,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'PUT') {
     const { plateNumber, vehicleType, fleetId, fleetManagerEmail, vendorEmail, taxExpiryDate } = req.body;
-    if (vehicleType && !['car', 'van', 'e_van', 'motorcycle', 'e_bike'].includes(vehicleType)) {
+    if (vehicleType && !['car', 'van', 'e_van', 'motorcycle', 'e_bike', 'light_truck', 'six_wheel_truck'].includes(vehicleType)) {
       return res.status(400).json({ error: 'Invalid vehicle type' });
     }
     if (taxExpiryDate !== undefined && taxExpiryDate !== null && !isDateString(taxExpiryDate)) {
