@@ -141,6 +141,60 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       vehicle_type: string;
     }>;
 
+    // One row per checklist result, matching the information shown in the
+    // saved-inspection detail view. Keep the inspection filters identical to
+    // the summary/detail sheets so every workbook tab describes the same scope.
+    const checklistDetailQuery = `
+      SELECT
+        il.id AS inspection_id,
+        il.inspection_date,
+        il.fleet_id,
+        il.inspector_name,
+        il.overall_status,
+        il.frequency,
+        il.mileage,
+        il.vehicle_usable,
+        il.odometer_photo_url,
+        il.photo_urls AS inspection_photo_urls,
+        vm.plate_number,
+        vm.vehicle_type,
+        ir.result,
+        ir.notes,
+        ir.photo_urls AS result_photo_urls,
+        ci.sort_order,
+        ci.item_name_th,
+        ci.item_name_en,
+        ci.section
+      FROM inspection_logs il
+      JOIN vehicle_master vm ON vm.id = il.vehicle_id
+      LEFT JOIN inspection_results ir ON ir.inspection_id = il.id
+      LEFT JOIN checklist_items ci ON ci.id = ir.checklist_item_id
+      ${inspectionWhere}
+      ORDER BY il.inspection_date DESC, il.created_at DESC, ci.sort_order NULLS LAST
+      LIMIT 50000
+    `;
+    const checklistDetails = await sql.query(checklistDetailQuery, inspectionParams) as Array<{
+      inspection_id: string;
+      inspection_date: string;
+      fleet_id: string;
+      inspector_name: string | null;
+      overall_status: string;
+      frequency: string | null;
+      mileage: number | null;
+      vehicle_usable: boolean | null;
+      odometer_photo_url: string | null;
+      inspection_photo_urls: string[] | null;
+      plate_number: string;
+      vehicle_type: string;
+      result: string | null;
+      notes: string | null;
+      result_photo_urls: string[] | null;
+      sort_order: number | null;
+      item_name_th: string | null;
+      item_name_en: string | null;
+      section: string | null;
+    }>;
+
     // Totals across period
     let totalInspections = 0;
     let totalPassed = 0;
@@ -358,6 +412,88 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     detail.views = [{ state: 'frozen', ySplit: 1 }];
     detail.autoFilter = { from: 'A1', to: 'I1' };
+
+    /* ─── Checklist detail sheet ─── */
+    const checklist = wb.addWorksheet('Checklist Detail', {
+      pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1 },
+    });
+    checklist.columns = [
+      { header: 'Inspection ID',       key: 'inspectionId', width: 38 },
+      { header: 'Date',                key: 'date',         width: 13 },
+      { header: 'Plate Number',        key: 'plate',        width: 14 },
+      { header: 'Fleet',               key: 'fleet',        width: 12 },
+      { header: 'Vehicle Type',        key: 'vtype',        width: 14 },
+      { header: 'Inspection Type',     key: 'frequency',    width: 16 },
+      { header: 'Inspector',           key: 'inspector',    width: 22 },
+      { header: 'Status',              key: 'status',       width: 10 },
+      { header: 'Mileage',             key: 'mileage',      width: 12 },
+      { header: 'Vehicle Usable',      key: 'usable',       width: 16 },
+      { header: 'Odometer Photo',      key: 'odometer',     width: 38 },
+      { header: 'Checklist #',         key: 'itemNumber',   width: 12 },
+      { header: 'Checklist Item (EN)',  key: 'itemEn',       width: 34 },
+      { header: 'Checklist Item (TH)',  key: 'itemTh',       width: 34 },
+      { header: 'Section',              key: 'section',      width: 14 },
+      { header: 'Result',               key: 'result',       width: 10 },
+      { header: 'Notes',                key: 'notes',        width: 32 },
+      { header: 'Checklist Photos',     key: 'itemPhotos',   width: 42 },
+      { header: 'Other Photos',         key: 'otherPhotos',  width: 42 },
+    ];
+    const checklistHeader = checklist.getRow(1);
+    checklistHeader.height = 22;
+    checklistHeader.eachCell((cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: YELLOW } };
+      cell.font = { bold: true, size: 10, color: { argb: TEXT } };
+      cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+      cell.border = { bottom: { style: 'medium', color: { argb: RED } } };
+    });
+
+    checklistDetails.forEach((row, i) => {
+      const itemPhotos = (row.result_photo_urls || []).filter(Boolean).join(', ');
+      const otherPhotos = (row.inspection_photo_urls || []).filter(Boolean).join(', ');
+      const r = checklist.addRow({
+        inspectionId: row.inspection_id,
+        date: formatDate(row.inspection_date),
+        plate: row.plate_number,
+        fleet: row.fleet_id,
+        vtype: vehicleLabel(row.vehicle_type),
+        frequency: row.frequency || 'daily',
+        inspector: row.inspector_name || '',
+        status: statusLabel(row.overall_status),
+        mileage: row.mileage ?? '',
+        usable: row.vehicle_usable === null ? '' : row.vehicle_usable ? 'Yes' : 'No',
+        odometer: row.odometer_photo_url || '',
+        itemNumber: row.sort_order === null ? '' : row.sort_order + 1,
+        itemEn: row.item_name_en || '',
+        itemTh: row.item_name_th || '',
+        section: row.section || '',
+        result: row.result ? statusLabel(row.result) : '',
+        notes: row.notes || '',
+        itemPhotos,
+        otherPhotos,
+      });
+      const rowBg = i % 2 === 0 ? 'FFFFFFFF' : 'FFFAFAFA';
+      r.eachCell((cell) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
+        cell.font = { size: 10 };
+        cell.alignment = { vertical: 'top', wrapText: true };
+        cell.border = { bottom: { style: 'thin', color: { argb: 'FFE0E0E0' } } };
+      });
+      if (row.result === 'fail') {
+        r.getCell('result').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: REDBG } };
+        r.getCell('result').font = { size: 10, bold: true };
+      } else if (row.result === 'pass') {
+        r.getCell('result').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: GREEN } };
+      }
+    });
+
+    if (checklistDetails.length === 0) {
+      const empty = checklist.addRow({ inspectionId: 'No checklist details in this period.' });
+      checklist.mergeCells(`A${empty.number}:S${empty.number}`);
+      empty.getCell('inspectionId').alignment = { horizontal: 'center' };
+      empty.getCell('inspectionId').font = { italic: true, color: { argb: 'FF888888' } };
+    }
+    checklist.views = [{ state: 'frozen', ySplit: 1 }];
+    checklist.autoFilter = { from: 'A1', to: 'S1' };
 
     const buffer = await wb.xlsx.writeBuffer();
     const today = new Date().toISOString().slice(0, 10);

@@ -5,6 +5,7 @@ const translations = {
     'nav.dashboard': 'ภาพรวม',
     'nav.issues': 'ปัญหาและการซ่อม',
     'nav.profile': 'โปรไฟล์',
+    'nav.export': 'ส่งออก',
     // Login
     'login.title': 'เข้าสู่ระบบ',
     'login.username': 'ชื่อผู้ใช้',
@@ -227,6 +228,7 @@ const translations = {
     // Dashboard export
     'dashboard.export': 'ส่งออก',
     'dashboard.exportTitle': 'ส่งออกรายงานแดชบอร์ด',
+    'export.description': 'เลือกฝูงรถและช่วงเวลาสำหรับดาวน์โหลดรายงาน Excel',
     'dashboard.exportFailed': 'ส่งออกไม่สำเร็จ',
     'dashboard.exportSaved': 'บันทึกไฟล์ส่งออกแล้ว',
     'issues.export': 'ส่งออก',
@@ -338,6 +340,7 @@ const translations = {
     'nav.dashboard': 'Dashboard',
     'nav.issues': 'Issues',
     'nav.profile': 'Profile',
+    'nav.export': 'Export',
     // Login
     'login.title': 'Sign In',
     'login.username': 'Username',
@@ -547,6 +550,7 @@ const translations = {
     // Dashboard export
     'dashboard.export': 'Export',
     'dashboard.exportTitle': 'Export Dashboard Report',
+    'export.description': 'Choose a fleet and time range to download an Excel report',
     'dashboard.exportFailed': 'Export Failed',
     'dashboard.exportSaved': 'Export saved',
     'issues.export': 'Export',
