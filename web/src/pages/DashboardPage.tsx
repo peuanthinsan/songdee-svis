@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import {
-  downloadExport,
   fetchDashboard,
   fetchMaintenance,
   notifyVendor,
@@ -446,7 +445,6 @@ export function DashboardPage() {
   const [maintData, setMaintData] = useState<MaintenanceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [exporting, setExporting] = useState(false);
   const [selectedFleet, setSelectedFleet] = useState<string | undefined>(undefined);
   const [allFleets, setAllFleets] = useState<string[]>([]);
   const [notifyingId, setNotifyingId] = useState<string | null>(null);
@@ -503,19 +501,6 @@ export function DashboardPage() {
   if (!user) return <Navigate to="/login" replace />;
   if (!isDashboardUser) return <Navigate to="/login" replace />;
 
-  async function onExport() {
-    try {
-      setExporting(true);
-      const params = new URLSearchParams();
-      if (fleetScope) params.set('fleetId', fleetScope);
-      await downloadExport(`/api/dashboard/export?${params.toString()}`, `dashboard-${data?.date || 'report'}.xlsx`);
-    } catch {
-      alert(t('exportFailed'));
-    } finally {
-      setExporting(false);
-    }
-  }
-
   async function onNotifyVendor(v: DefectVehicle) {
     setNotifyingId(v.issueId);
     try {
@@ -568,9 +553,6 @@ export function DashboardPage() {
               ))}
             </select>
           )}
-          <button type="button" className="btn btn--accent" onClick={onExport} disabled={exporting}>
-            {exporting ? '…' : t('export')}
-          </button>
         </div>
       </div>
 
