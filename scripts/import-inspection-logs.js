@@ -118,9 +118,26 @@ function buildRows(matrix, itemsByKey) {
       if (!item) errors.push(`row ${rowNumber}: no checklist match for ${JSON.stringify(column.name)} (${vehicleType}/${frequency})`);
       else results.push({ checklistItemId: item.id, result, notes: '' });
     }
-    records.push({ sourceId: inspectionId, date, plate: clean(row[2]), vehicleType, frequency, inspectorName, inspectorId: inspectorNameSource ? legacyInspectorId(inspectorNameSource) : 'legacy:unknown', overallStatus: results.some((r) => r.result === 'fail') ? 'fail' : 'pass', results });
+    records.push({ sourceId: inspectionId, date, plate: clean(row[2]), vehicleType, frequency, inspectorName, inspectorId: inspectorNameSource ? legacyInspectorId(inspectorNameSource) : 'legacy:unknown', overallStatus: results.some((r) => r.result === 'fail') ? 'fail' : 'pass', results: results.map((result) => ({ checklist_item_id: result.checklistItemId, result: result.result, notes: result.notes })) });
   }
   return { records, errors };
+}
+
+function excludedPlatesFromArgs(argv) {
+  const flag = argv.find((arg) => arg.startsWith('--exclude-plates='));
+  return new Set((flag ? flag.slice('--exclude-plates='.length) : '').split(',').map(clean).filter(Boolean));
+}
+
+function deduplicateRecords(records) {
+  const seen = new Set();
+  const unique = [];
+  for (const record of records) {
+    const key = `${record.plate}\u0000${record.date}\u0000${record.frequency}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(record);
+  }
+  return unique;
 }
 
 async function main() {
@@ -135,11 +152,17 @@ async function main() {
   const company = await resolveCompany(sql, { dryRun });
   const vehicles = await sql`SELECT id, plate_number, company_id FROM vehicle_master WHERE company_id = ${company.id}`;
   const items = await sql`SELECT id, vehicle_type, frequency, item_name_th FROM checklist_items WHERE company_id = ${company.id} AND is_active = true`;
-  const { records, errors } = buildRows(matrix, items);
+  const { records: parsedRecords, errors } = buildRows(matrix, items);
+  const excludedPlates = excludedPlatesFromArgs(process.argv);
+  const allowUnmapped = process.argv.includes('--allow-unmapped');
+  const recordsBeforeDedup = parsedRecords.filter((record) => !excludedPlates.has(record.plate));
+  const records = deduplicateRecords(recordsBeforeDedup);
   const vehicleMap = new Map(vehicles.map((vehicle) => [vehicle.plate_number, vehicle]));
   const missingPlates = [...new Set(records.filter((record) => !vehicleMap.has(record.plate)).map((record) => record.plate))];
   console.log(`Inspection import plan${dryRun ? ' (dry run)' : ''}:`);
   console.log(`  source rows: ${matrix.length - 1}`);
+  console.log(`  excluded vehicles: ${excludedPlates.size}${excludedPlates.size ? ` (${[...excludedPlates].join(', ')})` : ''}`);
+  console.log(`  duplicate source rows skipped: ${recordsBeforeDedup.length - records.length}`);
   console.log(`  valid rows: ${records.length}`);
   console.log(`  result rows: ${records.reduce((sum, record) => sum + record.results.length, 0)}`);
   console.log(`  failed inspections: ${records.filter((record) => record.overallStatus === 'fail').length}`);
@@ -152,14 +175,21 @@ async function main() {
   console.log(`  validation errors: ${errors.length}`);
   if (errorSummary.size) console.log([...errorSummary].map(([error, count]) => `  - ${error}: ${count} rows`).join('\n'));
   if (errors.length) console.log(errors.slice(0, 25).map((error) => `  - ${error}`).join('\n'));
-  if (missingPlates.length || errors.length) throw new Error('Import validation failed; no rows were written.');
+  if (allowUnmapped && errors.length) console.log('  unmapped checklist results will be skipped (--allow-unmapped).');
+  if (missingPlates.length || (!allowUnmapped && errors.length)) throw new Error('Import validation failed; no rows were written.');
   if (dryRun) { console.log('Dry run complete; no writes performed.'); return; }
 
   for (const record of records) {
     const vehicle = vehicleMap.get(record.plate);
-    const [existing] = await sql`SELECT id FROM inspection_logs WHERE vehicle_id = ${vehicle.id} AND company_id = ${company.id} AND inspection_date = ${record.date} AND frequency = ${record.frequency}`;
-    if (existing) continue;
-    const [log] = await sql`INSERT INTO inspection_logs (vehicle_id, inspector_id, inspector_name, fleet_id, company_id, inspection_date, overall_status, photo_urls, notes, frequency, mileage, odometer_photo_url, vehicle_usable) VALUES (${vehicle.id}, ${record.inspectorId}, ${record.inspectorName}, (SELECT fleet_id FROM vehicle_master WHERE id = ${vehicle.id}), ${company.id}, ${record.date}, ${record.overallStatus}, ARRAY[]::text[], '', ${record.frequency}, NULL, NULL, NULL) RETURNING id`;
+    const [existing] = await sql`SELECT il.id, EXISTS (SELECT 1 FROM inspection_results ir WHERE ir.inspection_id = il.id) AS has_results FROM inspection_logs il WHERE il.vehicle_id = ${vehicle.id} AND il.company_id = ${company.id} AND il.inspection_date = ${record.date} AND il.frequency = ${record.frequency}`;
+    if (existing?.has_results) continue;
+    if (existing && !existing.has_results) {
+      // Recover the one safe-to-replace shape left by a failed earlier run:
+      // an imported log whose result insert never completed.
+      await sql`DELETE FROM inspection_logs WHERE id = ${existing.id} AND company_id = ${company.id} AND NOT EXISTS (SELECT 1 FROM inspection_results WHERE inspection_id = ${existing.id})`;
+    }
+    const [log] = await sql`INSERT INTO inspection_logs (vehicle_id, inspector_id, inspector_name, fleet_id, company_id, inspection_date, overall_status, photo_urls, notes, frequency, mileage, odometer_photo_url, vehicle_usable) VALUES (${vehicle.id}, ${record.inspectorId}, ${record.inspectorName}, (SELECT fleet_id FROM vehicle_master WHERE id = ${vehicle.id}), ${company.id}, ${record.date}, ${record.overallStatus}, ARRAY[]::text[], '', ${record.frequency}, NULL, NULL, NULL) ON CONFLICT (vehicle_id, inspection_date, frequency) DO NOTHING RETURNING id`;
+    if (!log) continue;
     if (record.results.length) {
       await sql`INSERT INTO inspection_results (inspection_id, checklist_item_id, result, photo_urls, notes) SELECT ${log.id}, r.checklist_item_id::uuid, r.result, ARRAY[]::text[], r.notes FROM json_to_recordset(${JSON.stringify(record.results)}::json) AS r(checklist_item_id text, result text, notes text)`;
     }
@@ -167,5 +197,5 @@ async function main() {
   console.log('Import complete. Photos were not imported. Existing matching inspections were skipped.');
 }
 
-module.exports = { parseCsv, parseThaiDate, sourceResult, legacyInspectorId, sourceHeader, normalizeItemName, findChecklistItem, buildRows };
+module.exports = { parseCsv, parseThaiDate, sourceResult, legacyInspectorId, sourceHeader, normalizeItemName, findChecklistItem, buildRows, excludedPlatesFromArgs, deduplicateRecords };
 if (require.main === module) main().catch((error) => { console.error(error.message); process.exit(1); });
