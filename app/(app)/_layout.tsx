@@ -60,6 +60,15 @@ export default function AppLayout() {
         }}
       />
       <Tabs.Screen
+        name="export"
+        options={{
+          title: t('nav.export'),
+          tabBarLabel: t('nav.export'),
+          tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'download' : 'download-outline'} size={21} color={color} />,
+          href: isDriver ? null : undefined,
+        }}
+      />
+      <Tabs.Screen
         name="issues"
         options={{
           title: t('nav.issues'),

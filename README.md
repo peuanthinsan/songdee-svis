@@ -1,6 +1,6 @@
 # SVIS
 
-**Songdee Vehicle Inspection System** is a multi-company mobile and web platform for
+**Vehicle Inspection System** is a multi-company mobile and web platform for
 daily fleet inspections, defect reporting, repair evidence, maintenance planning, and
 operations dashboards.
 
@@ -72,6 +72,6 @@ company. Supervisors and drivers are additionally restricted to their assigned f
 
 ## Branding
 
-SVIS uses navy `#06264B` and cyan `#00A6C8`, with the Songdee red location mark and the
+SVIS uses navy `#06264B` and cyan `#00A6C8`, with the Fleet red location mark and the
 vehicle-inspection shield artwork. Source and store assets are in `assets/`,
 `store-assets/`, and `web/public/`.
