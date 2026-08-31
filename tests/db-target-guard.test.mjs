@@ -230,7 +230,7 @@ const NO_DRY_RUN_SCRIPTS = ['migrate-020.js', 'migrate-021.js', 'reset-admin-pas
 
 // Class B: dry-run legitimately connects to read current state before it can
 // print a preview.
-const CLASS_B_SCRIPTS = ['seed-db.js', 'seed-users-postgres.js', 'wipe-history.js'];
+const CLASS_B_SCRIPTS = ['seed-db.js', 'seed-users-postgres.js', 'wipe-history.js', 'import-inspection-logs.js'];
 
 const ALL_SCRIPTS = [...CLASS_A_SCRIPTS, ...NO_DRY_RUN_SCRIPTS, ...CLASS_B_SCRIPTS];
 
@@ -311,6 +311,10 @@ test('the classification matrix (CLASS_A/NO_DRY_RUN/CLASS_B) exactly matches eve
 // the guard is actually reached — otherwise this test would only prove that
 // an unrelated earlier check works, not that the guard does.
 const SCRIPT_INPUT_OVERRIDES = {
+  'import-inspection-logs.js': {
+    args: ['tests/fixtures/empty-inspection-export.csv'],
+    env: { SVIS_COMPANY_SLUG: 'dhl' },
+  },
   'reset-admin-password.js': {
     args: [],
     env: { SVIS_ADMIN_PASSWORD: 'dummy-fake-admin-password-for-test' },
@@ -433,8 +437,9 @@ for (const scriptName of CLASS_B_SCRIPTS) {
     }
 
     // wipe-history.js's dry-run is "no --yes"; the other two use --dry-run.
-    const args = scriptName === 'wipe-history.js' ? [] : ['--dry-run'];
-    const result = runScript(scriptName, args);
+    const { args: inputArgs, env } = scriptInputs(scriptName);
+    const args = scriptName === 'wipe-history.js' ? inputArgs : [...inputArgs, '--dry-run'];
+    const result = runScript(scriptName, args, env);
 
     assert.match(result.stdout, /DATABASE TARGET/);
     assert.match(result.stdout, /DRY RUN/);
