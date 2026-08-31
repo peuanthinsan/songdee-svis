@@ -19,6 +19,13 @@ function formatDate(d: string | Date | null | undefined) {
   return date.toLocaleDateString('en-GB');
 }
 
+function excelDate(d: string | Date | null | undefined) {
+  if (!d) return '';
+  return typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)
+    ? new Date(`${d}T00:00:00Z`)
+    : new Date(d);
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -370,8 +377,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const detailHeader = detail.getRow(1);
     detailHeader.height = 22;
     detailHeader.eachCell((cell) => {
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: YELLOW } };
-      cell.font = { bold: true, size: 10, color: { argb: TEXT } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF5B9BD5' } };
+      cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
       cell.alignment = { vertical: 'middle', horizontal: 'center' };
       cell.border = { bottom: { style: 'medium', color: { argb: RED } } };
     });
@@ -379,15 +386,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     details.forEach((row, i) => {
       const r = detail.addRow({
         num:       i + 1,
-        date:      formatDate(row.inspection_date),
+        date:      excelDate(row.inspection_date),
         plate:     row.plate_number,
         fleet:     row.fleet_id,
         vtype:     vehicleLabel(row.vehicle_type),
         frequency: row.frequency || 'daily',
         inspector: row.inspector_name || '',
         status:    statusLabel(row.overall_status),
-        created:   new Date(row.created_at).toLocaleString('en-GB'),
+        created:   excelDate(row.created_at),
       });
+      r.getCell('date').numFmt = 'dd/mm/yyyy';
+      r.getCell('created').numFmt = 'dd/mm/yyyy, hh:mm:ss';
       const rowBg = i % 2 === 0 ? 'FFFFFFFF' : 'FFFAFAFA';
       r.eachCell((cell) => {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
@@ -412,6 +421,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     detail.views = [{ state: 'frozen', ySplit: 1 }];
     detail.autoFilter = { from: 'A1', to: 'I1' };
+    if (details.length > 0) {
+      detail.addTable({
+        name: 'InspectionsTable',
+        ref: `A1:I${details.length + 1}`,
+        headerRow: true,
+        totalsRow: false,
+        style: { theme: 'TableStyleMedium2', showRowStripes: false },
+        columns: [
+          { name: '#' },
+          { name: 'Date' },
+          { name: 'Plate Number' },
+          { name: 'Fleet' },
+          { name: 'Vehicle Type' },
+          { name: 'Frequency' },
+          { name: 'Inspector' },
+          { name: 'Status' },
+          { name: 'Logged At' },
+        ],
+        rows: details.map((_, i) => [
+          i + 1,
+          excelDate(details[i].inspection_date),
+          details[i].plate_number,
+          details[i].fleet_id,
+          vehicleLabel(details[i].vehicle_type),
+          details[i].frequency || 'daily',
+          details[i].inspector_name || '',
+          statusLabel(details[i].overall_status),
+          excelDate(details[i].created_at),
+        ]),
+      });
+    }
 
     /* ─── Checklist detail sheet ─── */
     const checklist = wb.addWorksheet('Checklist Detail', {
