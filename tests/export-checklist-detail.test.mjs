@@ -15,6 +15,17 @@ test('dashboard workbook includes saved inspection checklist details', async () 
   assert.match(source, /checklist\.autoFilter = \{ from: 'A1', to: 'S1' \}/);
 });
 
+test('inspection export includes the cargo-box check and failure remark columns', async () => {
+  const source = await readFile(new URL('../api/dashboard/export.ts', import.meta.url), 'utf8');
+
+  assert.match(source, /header: 'Cargo box 7-point check'/);
+  assert.match(source, /header: 'Remark'/);
+  assert.match(source, /cargo_box_check/);
+  assert.match(source, /failed_result\.result = 'fail'/);
+  assert.match(source, /AS failed_remarks/);
+  assert.match(source, /detail\.autoFilter = \{ from: 'A1', to: 'K1' \}/);
+});
+
 test('inspection failures use the fleet email entered in the Fleets admin tab', async () => {
   const source = await readFile(new URL('../api/inspections.ts', import.meta.url), 'utf8');
 

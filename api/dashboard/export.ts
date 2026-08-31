@@ -13,6 +13,10 @@ function statusLabel(s: string) {
   return s === 'pass' ? 'Pass' : s === 'fail' ? 'Fail' : s;
 }
 
+function cargoCheckLabel(s: string | null | undefined) {
+  return s === 'pass' ? 'OK' : s === 'fail' ? 'Fail' : '';
+}
+
 function formatDate(d: string | Date | null | undefined) {
   if (!d) return '';
   const date = typeof d === 'string' ? new Date(d) : d;
@@ -130,7 +134,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         il.frequency,
         il.created_at,
         vm.plate_number,
-        vm.vehicle_type
+        vm.vehicle_type,
+        (
+          SELECT cargo_result.result
+          FROM inspection_results cargo_result
+          JOIN checklist_items cargo_item ON cargo_item.id = cargo_result.checklist_item_id
+          WHERE cargo_result.inspection_id = il.id
+            AND LOWER(TRIM(cargo_item.item_name_en)) = 'cargo box 7-point check'
+          LIMIT 1
+        ) AS cargo_box_check,
+        (
+          SELECT STRING_AGG(
+            COALESCE(NULLIF(TRIM(failed_item.item_name_en), ''), NULLIF(TRIM(failed_item.item_name_th), ''), 'Checklist item')
+              || CASE WHEN NULLIF(TRIM(failed_result.notes), '') IS NOT NULL
+                THEN ': ' || TRIM(failed_result.notes) ELSE '' END,
+            E'\n' ORDER BY failed_item.sort_order NULLS LAST
+          )
+          FROM inspection_results failed_result
+          JOIN checklist_items failed_item ON failed_item.id = failed_result.checklist_item_id
+          WHERE failed_result.inspection_id = il.id
+            AND failed_result.result = 'fail'
+        ) AS failed_remarks
       FROM inspection_logs il
       JOIN vehicle_master vm ON vm.id = il.vehicle_id
       ${inspectionWhere}
@@ -146,6 +170,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       created_at: string;
       plate_number: string;
       vehicle_type: string;
+      cargo_box_check: string | null;
+      failed_remarks: string | null;
     }>;
 
     // One row per checklist result, matching the information shown in the
@@ -373,6 +399,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       { header: 'Inspector',       key: 'inspector', width: 22 },
       { header: 'Status',          key: 'status',    width: 10 },
       { header: 'Logged At',       key: 'created',   width: 16 },
+      { header: 'Cargo box 7-point check', key: 'cargoCheck', width: 22 },
+      { header: 'Remark',           key: 'remark',    width: 32 },
     ];
     const detailHeader = detail.getRow(1);
     detailHeader.height = 22;
@@ -394,6 +422,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         inspector: row.inspector_name || '',
         status:    statusLabel(row.overall_status),
         created:   excelDate(row.created_at),
+        cargoCheck: cargoCheckLabel(row.cargo_box_check),
+        remark:    row.failed_remarks || '',
       });
       r.getCell('date').numFmt = 'dd/mm/yyyy';
       r.getCell('created').numFmt = 'dd/mm/yyyy, hh:mm:ss';
@@ -420,11 +450,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     detail.views = [{ state: 'frozen', ySplit: 1 }];
-    detail.autoFilter = { from: 'A1', to: 'I1' };
+    detail.autoFilter = { from: 'A1', to: 'K1' };
     if (details.length > 0) {
       detail.addTable({
         name: 'InspectionsTable',
-        ref: `A1:I${details.length + 1}`,
+        ref: `A1:K${details.length + 1}`,
         headerRow: true,
         totalsRow: false,
         style: { theme: 'TableStyleMedium2', showRowStripes: false },
@@ -438,6 +468,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           { name: 'Inspector' },
           { name: 'Status' },
           { name: 'Logged At' },
+          { name: 'Cargo box 7-point check' },
+          { name: 'Remark' },
         ],
         rows: details.map((_, i) => [
           i + 1,
@@ -449,6 +481,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           details[i].inspector_name || '',
           statusLabel(details[i].overall_status),
           excelDate(details[i].created_at),
+          cargoCheckLabel(details[i].cargo_box_check),
+          details[i].failed_remarks || '',
         ]),
       });
     }
