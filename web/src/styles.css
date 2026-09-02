@@ -219,6 +219,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .data-table tbody tr, .unit-table tbody tr { transition: background 100ms ease; }
 .data-table tbody tr:hover, .unit-table tbody tr:hover { background: color-mix(in srgb, var(--brand-primary) 3%, white); }
 .data-table tbody tr:last-child td, .unit-table tbody tr:last-child td { border-bottom: 0; }
+.data-table td.issue-checklist-cell {
+  min-width: 180px; max-width: 320px; white-space: normal; overflow-wrap: anywhere; line-height: 1.4;
+}
+.issue-checklist-summary {
+  display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+}
 .unit-table__attention { background: #fff8f6; }
 .table-empty { padding: 28px; text-align: center; color: var(--text-secondary); font-size: 13px; }
 

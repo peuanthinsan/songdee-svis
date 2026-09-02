@@ -2,7 +2,12 @@ import { useEffect, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { fetchIssues, type IssueRow, updateIssueStatus, uploadInspectionPhoto } from '../api';
 import { useAuth } from '../AuthContext';
-import { t } from '../i18n';
+import { getLang, t } from '../i18n';
+import {
+  localizedFailedChecklistItemLabel,
+  localizedFailedChecklistItemLabels,
+  partitionFailedChecklistPhotos,
+} from '../issue-checklist';
 import { PhotoGrid } from '../components/PhotoGrid';
 import { formatDateThai, formatDateTimeThai } from '../lib/format-date';
 
@@ -22,6 +27,11 @@ function IssueModal({ issue, onClose, onStartRepair, onCompleteRepair, updating 
   onCompleteRepair: (file: File) => void;
   updating: boolean;
 }) {
+  const lang = getLang();
+  const { mappedItems: mappedDefectItems, unassociatedUrls: unassociatedDefectUrls } = partitionFailedChecklistPhotos(
+    issue.failed_checklist_items,
+    issue.defect_photo_urls,
+  );
   const hasPhotos = (issue.defect_photo_urls?.length ?? 0) + (issue.completion_photo_urls?.length ?? 0) > 0;
   return (
     <div
@@ -47,9 +57,19 @@ function IssueModal({ issue, onClose, onStartRepair, onCompleteRepair, updating 
           <div style={{ color:'var(--text-secondary)', textAlign:'center', padding:'32px 0', fontSize:14 }}>{t('noData')}</div>
         )}
 
-        {(issue.defect_photo_urls?.length ?? 0) > 0 && (
+        {mappedDefectItems.map((item) => (
+          <div key={item.checklist_item_id} style={{ marginBottom:20 }}>
+            <PhotoGrid
+              urls={item.photo_urls!}
+              label={`${t('defectPhotos')} — ${localizedFailedChecklistItemLabel(item, lang) || t('checklistItem')}`}
+              maxThumb={160}
+            />
+          </div>
+        ))}
+
+        {unassociatedDefectUrls.length > 0 && (
           <div style={{ marginBottom:20 }}>
-            <PhotoGrid urls={issue.defect_photo_urls!} label={t('defectPhotos') || 'Defect Photos'} maxThumb={160} />
+            <PhotoGrid urls={unassociatedDefectUrls} label={t('defectPhotos')} maxThumb={160} />
           </div>
         )}
 
@@ -190,6 +210,7 @@ export function IssuesPage() {
                 <tr>
                   <th>{t('plate')}</th>
                   <th>{t('fleet')}</th>
+                  <th>{t('failedChecklistItems')}</th>
                   <th>{t('status')}</th>
                   <th>{t('date')}</th>
                   <th style={{ textAlign:'center' }}>{t('photos') || '📷'}</th>
@@ -198,6 +219,10 @@ export function IssuesPage() {
               <tbody>
                 {issues.map((issue) => {
                   const photoCount = (issue.defect_photo_urls?.length ?? 0) + (issue.completion_photo_urls?.length ?? 0);
+                  const checklistLabels = localizedFailedChecklistItemLabels(issue.failed_checklist_items, getLang());
+                  const checklistSummary = checklistLabels.length > 2
+                    ? `${checklistLabels.slice(0, 2).join(' • ')} • ${t('moreItems', { count: String(checklistLabels.length - 2) })}`
+                    : checklistLabels.join(' • ');
                   return (
                     <tr
                       key={issue.id}
@@ -206,6 +231,18 @@ export function IssuesPage() {
                     >
                       <td><strong>{issue.plate_number}</strong></td>
                       <td>{issue.vehicle_fleet || issue.fleet_id || '—'}</td>
+                      <td className="issue-checklist-cell">
+                        <span
+                          className="issue-checklist-summary"
+                          title={checklistLabels.join(' • ') || undefined}
+                          aria-hidden={checklistLabels.length > 0 ? true : undefined}
+                        >
+                          {checklistSummary || '—'}
+                        </span>
+                        {checklistLabels.length > 0 && (
+                          <span className="visually-hidden">{checklistLabels.join(' • ')}</span>
+                        )}
+                      </td>
                       <td><span className={`badge badge--${issue.status}`}>{statusLabel(issue.status)}</span></td>
                       <td>{issue.inspection_date ? formatDateThai(issue.inspection_date) : formatDateTimeThai(issue.created_at)}</td>
                       <td style={{ textAlign:'center', color: photoCount > 0 ? 'var(--brand-primary)' : 'var(--text-secondary)' }}>

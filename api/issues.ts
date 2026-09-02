@@ -104,23 +104,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // The linked failed inspection is the source of truth for defect evidence.
     // Backfill the response from its failed checklist results so an older or
     // previously refreshed issue row cannot hide photos from the latest fail.
+    // Keep the checklist result records too so clients can identify which
+    // checklist item each defect photo belongs to.
     const inspectionIds = issues.map((issue: any) => issue.inspection_id).filter(Boolean);
     if (inspectionIds.length > 0) {
-      const failedPhotos = await sql`
+      const failedEvidence = await sql`
+        WITH failed_items AS (
+          SELECT ir.inspection_id, ir.checklist_item_id, ir.photo_urls, ir.notes,
+                 ci.item_name_th, ci.item_name_en, ci.section, ci.sort_order
+          FROM inspection_results ir
+          JOIN checklist_items ci ON ci.id = ir.checklist_item_id
+          WHERE ir.inspection_id = ANY(${inspectionIds}::uuid[])
+            AND ir.result = 'fail'
+            AND ci.company_id = ${user.companyId}
+        ),
+        failed_photos AS (
+          SELECT ir.inspection_id,
+                 ARRAY_AGG(photo_url ORDER BY ir.sort_order, ir.checklist_item_id, photo_order) AS defect_photo_urls
+          FROM failed_items ir
+          CROSS JOIN LATERAL unnest(ir.photo_urls) WITH ORDINALITY AS photo(photo_url, photo_order)
+          GROUP BY ir.inspection_id
+        )
         SELECT ir.inspection_id,
-               ARRAY_AGG(photo_url) AS defect_photo_urls
-        FROM inspection_results ir
-        CROSS JOIN LATERAL unnest(ir.photo_urls) AS photo_url
-        WHERE ir.inspection_id = ANY(${inspectionIds}::uuid[])
-          AND ir.result = 'fail'
-        GROUP BY ir.inspection_id
+               JSONB_AGG(
+                 JSONB_BUILD_OBJECT(
+                   'checklist_item_id', ir.checklist_item_id,
+                   'item_name_th', ir.item_name_th,
+                   'item_name_en', ir.item_name_en,
+                   'section', ir.section,
+                   'notes', ir.notes,
+                   'photo_urls', ir.photo_urls
+                 )
+                 ORDER BY ir.sort_order, ir.checklist_item_id
+               ) AS failed_checklist_items,
+               fp.defect_photo_urls
+        FROM failed_items ir
+        LEFT JOIN failed_photos fp ON fp.inspection_id = ir.inspection_id
+        GROUP BY ir.inspection_id, fp.defect_photo_urls
       `;
-      const photosByInspection = new Map<string, string[]>(
-        failedPhotos.map((row: any) => [row.inspection_id, row.defect_photo_urls || []]),
+      const evidenceByInspection = new Map<string, any>(
+        failedEvidence.map((row: any) => [row.inspection_id, row]),
       );
       for (const issue of issues) {
-        const photos = photosByInspection.get(issue.inspection_id);
-        if (photos?.length) issue.defect_photo_urls = photos;
+        const evidence = evidenceByInspection.get(issue.inspection_id);
+        if (evidence?.defect_photo_urls?.length) issue.defect_photo_urls = evidence.defect_photo_urls;
+        issue.failed_checklist_items = evidence?.failed_checklist_items || [];
       }
     }
     res.status(200).json({ issues, limit, offset });

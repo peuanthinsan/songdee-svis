@@ -1,4 +1,5 @@
 import { getToken } from './auth';
+import type { FailedChecklistItem } from './issue-checklist';
 
 export class ApiError extends Error {
   status: number;
@@ -204,6 +205,7 @@ export type IssueRow = {
   created_at: string;
   defect_photo_urls?: string[];
   completion_photo_urls?: string[];
+  failed_checklist_items?: FailedChecklistItem[];
 };
 
 export function login(username: string, password: string, companySlug = 'dhl') {
