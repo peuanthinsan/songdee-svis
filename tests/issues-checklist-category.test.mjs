@@ -137,8 +137,9 @@ test('issues API returns ordered failed checklist items with their own photos', 
   assert.ok(evidenceQuery.values.includes('company-1'));
 });
 
-test('Issues table places failed checklist items immediately after Fleet', async () => {
+test('Issues table places every failed checklist item immediately after Fleet', async () => {
   const source = await readFile(new URL('../web/src/pages/IssuesPage.tsx', import.meta.url), 'utf8');
+  const styles = await readFile(new URL('../web/src/styles.css', import.meta.url), 'utf8');
   const fleetHeader = source.indexOf("<th>{t('fleet')}</th>");
   const checklistHeader = source.indexOf("<th>{t('failedChecklistItems')}</th>");
   const statusHeader = source.indexOf("<th>{t('status')}</th>");
@@ -153,11 +154,12 @@ test('Issues table places failed checklist items immediately after Fleet', async
   assert.ok(checklistCell > fleetCell);
   assert.ok(statusCell > checklistCell);
   assert.match(source, /localizedFailedChecklistItemLabels\(issue\.failed_checklist_items, getLang\(\)\)/);
-  assert.match(source, /checklistLabels\.slice\(0, 2\)\.join\(' • '\)/);
+  assert.match(source, /const checklistSummary = checklistLabels\.join\(' • '\)/);
   assert.match(source, /\{checklistSummary \|\| '—'\}/);
-  assert.match(source, /className="issue-checklist-summary"/);
-  assert.match(source, /aria-hidden=\{checklistLabels\.length > 0 \? true : undefined\}/);
-  assert.match(source, /<span className="visually-hidden">\{checklistLabels\.join\(' • '\)\}<\/span>/);
+  assert.doesNotMatch(source, /checklistLabels\.slice\(/);
+  assert.doesNotMatch(source, /moreItems/);
+  assert.doesNotMatch(styles, /issue-checklist-summary/);
+  assert.doesNotMatch(styles, /line-clamp/);
 });
 
 test('Issue modal groups defect photos by failed checklist item', async () => {

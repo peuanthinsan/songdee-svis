@@ -222,9 +222,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .data-table td.issue-checklist-cell {
   min-width: 180px; max-width: 320px; white-space: normal; overflow-wrap: anywhere; line-height: 1.4;
 }
-.issue-checklist-summary {
-  display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
-}
 .unit-table__attention { background: #fff8f6; }
 .table-empty { padding: 28px; text-align: center; color: var(--text-secondary); font-size: 13px; }
 

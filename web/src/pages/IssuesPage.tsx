@@ -220,9 +220,7 @@ export function IssuesPage() {
                 {issues.map((issue) => {
                   const photoCount = (issue.defect_photo_urls?.length ?? 0) + (issue.completion_photo_urls?.length ?? 0);
                   const checklistLabels = localizedFailedChecklistItemLabels(issue.failed_checklist_items, getLang());
-                  const checklistSummary = checklistLabels.length > 2
-                    ? `${checklistLabels.slice(0, 2).join(' • ')} • ${t('moreItems', { count: String(checklistLabels.length - 2) })}`
-                    : checklistLabels.join(' • ');
+                  const checklistSummary = checklistLabels.join(' • ');
                   return (
                     <tr
                       key={issue.id}
@@ -232,16 +230,7 @@ export function IssuesPage() {
                       <td><strong>{issue.plate_number}</strong></td>
                       <td>{issue.vehicle_fleet || issue.fleet_id || '—'}</td>
                       <td className="issue-checklist-cell">
-                        <span
-                          className="issue-checklist-summary"
-                          title={checklistLabels.join(' • ') || undefined}
-                          aria-hidden={checklistLabels.length > 0 ? true : undefined}
-                        >
-                          {checklistSummary || '—'}
-                        </span>
-                        {checklistLabels.length > 0 && (
-                          <span className="visually-hidden">{checklistLabels.join(' • ')}</span>
-                        )}
+                        {checklistSummary || '—'}
                       </td>
                       <td><span className={`badge badge--${issue.status}`}>{statusLabel(issue.status)}</span></td>
                       <td>{issue.inspection_date ? formatDateThai(issue.inspection_date) : formatDateTimeThai(issue.created_at)}</td>
