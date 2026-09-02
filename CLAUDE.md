@@ -166,7 +166,7 @@ Codex implements features via `codex-delegation` / `codex-build` skills:
   photos, `vendor_notified_at`, migration `016`)
 - `vehicle_activity_log` (migration `017`) — one row per vehicle per Bangkok day the
   telematics sheet showed it GPS-online (`running`/`stopped`); written as a side effect of
-  the dashboard/unit-status APIs; backs the Active donut and the weekly-donut denominator
+  the dashboard/unit-status APIs; preserves daily GPS activity history
 - `vehicle_maintenance` (migration `017`) — admin-entered preventive-maintenance baselines
   (last service/tire/battery date + mileage); no seed data, every vehicle starts `noData`
 - `companies` (migration `019`) — active customer tenants; DHL is seeded as the default
@@ -186,8 +186,9 @@ Full metric-by-metric formulas (numerators, denominators, edge cases) live in
 - **Active is telematics-based** (shipped 2026-07, `371b2da`): when
   `app_settings.unit_status_sheet_url` is configured, a vehicle is "Active" if the
   telematics sheet shows it `running`/`stopped` (not `offline`) for the day; without
-  telematics it falls back to `totalVehicles − outOfService.total`. Pre-Route/Post-Route/
-  Weekly donut denominators switch to the Active set once telematics is on, not full fleet.
+  telematics it falls back to `totalVehicles − outOfService.total`. Pre-Route,
+  Post-Route, and Weekly completion are independent of GPS activity: their numerators come
+  from saved inspections and their denominators are the selected active fleet roster.
 - **Out of Service now comes from a checklist question, not defect count**: driven by
   `inspection_logs.vehicle_usable` (migration `017`, "is the vehicle usable?"), taking each
   vehicle's *most recent* non-null answer. Replaces the earlier open-defect-count proxy;

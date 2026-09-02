@@ -117,7 +117,7 @@ export type CompletionStat = {
   pending: number;
   percentage: number;
   byType: TypeBreakdown;
-  /** Per-type denominators (Active vehicles when telematics is configured). */
+  /** Per-type denominator for the selected fleet roster. */
   totalByType: TypeBreakdown;
 };
 
@@ -143,7 +143,7 @@ export type DashboardData = {
   fleetId: string | null;
   totalVehicles: number;
   byType: TypeBreakdown;
-  /** True when the GPS sheet is configured, i.e. Active/denominators are telematics-based. */
+  /** True when the GPS sheet is configured, so the Active metric is telematics-based. */
   telematics: boolean;
   /** GPS counters and rows from the same scoped telematics snapshot as the metrics. */
   unitStatus: UnitStatusData | null;

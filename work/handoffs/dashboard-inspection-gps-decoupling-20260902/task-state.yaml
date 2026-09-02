@@ -1,0 +1,17 @@
+task_id: dashboard-inspection-gps-decoupling-20260902
+active_root: codex
+delegated_provider: claude
+phase: verified
+requested_lane: review
+observed_active_model: UNKNOWN
+observed_active_effort: UNKNOWN
+requested_review_model: fable
+requested_review_effort: high
+base_ref: 80ba8d4a9459de6f33a8d7d751e590f566cbd14c
+writer_lease: active_root_source_delegated_receipt_only
+status: complete
+review_status: fallback_codex_complete_opposite_provider_unavailable
+external_mutations: prohibited
+git_mutations: prohibited
+database_mutations: prohibited
+deployment: prohibited

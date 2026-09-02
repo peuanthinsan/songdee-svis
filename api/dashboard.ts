@@ -174,8 +174,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const telematics = sheetVehicles !== null;
     let activeTodayIds = new Set<string>();
     let activeTodayByType = emptyTypes();
-    let weeklyActiveIds = new Set<string>();
-    let weeklyActiveByType = emptyTypes();
 
     if (telematics) {
       const activeRefs: VehicleRef[] = [];
@@ -187,38 +185,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       activeTodayByType = countByType(activeRefs);
       activeTodayIds = new Set(activeRefs.map(r => r.vehicle_id));
 
-      // Persist today's snapshot while reading the week's activity. Unioning the
-      // current refs makes the result correct even if the read wins the race.
-      const [weeklyActiveRows] = await Promise.all([
-        sql`
-          SELECT DISTINCT a.vehicle_id, v.vehicle_type
-          FROM vehicle_activity_log a
-          JOIN vehicle_master v ON v.id = a.vehicle_id
-          WHERE a.activity_date >= ${monday}
-            AND a.activity_date <= ${today}
-            AND a.company_id = ${user.companyId}
-            AND (${fleet}::text IS NULL OR v.fleet_id = ${fleet})
-        `,
-        recordVehicleActivity(sql, sheetVehicles!, today, user.companyId),
-      ]);
-      const weeklyActivityRefs = [...weeklyActiveRows as VehicleRef[], ...activeRefs];
-      weeklyActiveByType = countByType(weeklyActivityRefs);
-      weeklyActiveIds = new Set(weeklyActivityRefs.map(r => r.vehicle_id));
+      // Keep the activity history current for Unit Status without making inspection
+      // completion depend on whether the GPS sheet currently reports a vehicle online.
+      await recordVehicleActivity(sql, sheetVehicles!, today, user.companyId);
     }
 
-    // Completion numerators: inspected vehicles, restricted to the Active set when
-    // telematics is available (comments 2-4: completed vs Active vehicles).
+    // Completion numerators come from saved inspections. GPS activity is a separate
+    // operational signal and must not hide a completed inspection for an offline or
+    // unmatched vehicle.
     const inspected = inspectedRows as Array<VehicleRef & { frequency: string }>;
     const dailyRefs = inspected.filter(r => r.frequency === 'daily');
     const postRouteRefs = inspected.filter(r => r.frequency === 'post_route');
     const weeklyRefs = weeklyInspectedRows as VehicleRef[];
 
-    const restrict = (refs: VehicleRef[], activeIds: Set<string>) =>
-      telematics ? refs.filter(r => activeIds.has(r.vehicle_id)) : refs;
-
-    const dailyByType = countByType(restrict(dailyRefs, activeTodayIds));
-    const postRouteByType = countByType(restrict(postRouteRefs, activeTodayIds));
-    const weeklyByType = countByType(restrict(weeklyRefs, weeklyActiveIds));
+    const dailyByType = countByType(dailyRefs);
+    const postRouteByType = countByType(postRouteRefs);
+    const weeklyByType = countByType(weeklyRefs);
 
     // Reuse this same telematics snapshot for the GPS counters/table so a fleet
     // switch performs one sheet download and returns one internally consistent view.
@@ -264,9 +246,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const defectTotal = (issueCount as any[])[0]?.total ?? 0;
     const defectToday = (issueCount as any[])[0]?.today ?? 0;
 
-    // Denominators: Active vehicles when telematics is configured, fleet size otherwise.
-    const dailyDenom = telematics ? activeTodayByType : byType;
-    const weeklyDenom = telematics ? weeklyActiveByType : byType;
+    // Inspection completion is measured against the selected fleet roster. Only the
+    // Active card is GPS-based.
     const activeByType = telematics ? activeTodayByType : byType;
     const activeCount = telematics ? activeTodayIds.size : totalVehicles - oosTotal;
 
@@ -291,7 +272,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       pending: f.total - (checkedMap[f.fleet_id] || 0),
     }));
 
-    const preDeparture = completion(dailyByType, dailyDenom);
+    const preDeparture = completion(dailyByType, byType);
 
     res.status(200).json({
       date: today,
@@ -309,8 +290,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         totalByType: byType,
       },
       preDeparture,
-      postRoute: completion(postRouteByType, dailyDenom),
-      weekly: completion(weeklyByType, weeklyDenom),
+      postRoute: completion(postRouteByType, byType),
+      weekly: completion(weeklyByType, byType),
       outOfService: { total: oosTotal, today: oosToday },
       withDefect: {
         total: defectTotal,
