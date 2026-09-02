@@ -18,6 +18,8 @@ import {
 } from '../api';
 import { useAuth } from '../AuthContext';
 import { DonutChart, type DonutSegment } from '../components/DonutChart';
+import { FleetFilterSelect } from '../components/FleetFilterSelect';
+import { useFleetFilter } from '../FleetFilterContext';
 import { t } from '../i18n';
 import { formatDateThai } from '../lib/format-date';
 
@@ -440,17 +442,13 @@ function StatusDonutCard({
 
 export function DashboardPage() {
   const { user, isDashboardUser } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const { fleetScope } = useFleetFilter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [maintData, setMaintData] = useState<MaintenanceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedFleet, setSelectedFleet] = useState<string | undefined>(undefined);
-  const [allFleets, setAllFleets] = useState<string[]>([]);
   const [notifyingId, setNotifyingId] = useState<string | null>(null);
   const [notifiedIds, setNotifiedIds] = useState<Record<string, string>>({});
-
-  const fleetScope = isAdmin ? selectedFleet : user?.fleetId;
 
   // Monotonic guard so only the latest load() applies its results: drops out-of-order
   // 60s-poll/fleet-switch responses and post-unmount state writes (last-resolved-wins bug).
@@ -468,10 +466,6 @@ export function DashboardPage() {
       const result = await fetchDashboard(fleetScope, controller.signal);
       if (loadGenRef.current !== myGen) return;
       setData(result);
-      // Capture the full fleet list from an unscoped admin load to populate the filter dropdown.
-      if (isAdmin && !fleetScope) {
-        setAllFleets(result.fleets.map((f) => f.fleetId));
-      }
       // The core metrics and GPS table are coherent in `result`; do not make the
       // user wait for the optional maintenance calculation before showing them.
       setLoading(false);
@@ -486,7 +480,12 @@ export function DashboardPage() {
     } finally {
       if (loadGenRef.current === myGen) setLoading(false);
     }
-  }, [fleetScope, isAdmin]);
+  }, [fleetScope]);
+
+  useEffect(() => {
+    setLoading(true);
+    setMaintData(null);
+  }, [fleetScope]);
 
   useEffect(() => {
     load();
@@ -536,23 +535,7 @@ export function DashboardPage() {
           <p className="muted">{t('today')} {formatDateThai(data.date)}</p>
         </div>
         <div className="header-actions">
-          {isAdmin && (
-            <select
-              className="fleet-select"
-              value={selectedFleet ?? ''}
-              onChange={(e) => {
-                setLoading(true);
-                setMaintData(null);
-                setSelectedFleet(e.target.value || undefined);
-              }}
-              aria-label={t('fleet')}
-            >
-              <option value="">{t('allFleets')}</option>
-              {allFleets.map((f) => (
-                <option key={f} value={f}>{f}</option>
-              ))}
-            </select>
-          )}
+          <FleetFilterSelect />
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { fetchHistory, fetchInspectionDetail, type HistoryData, type InspectionDetail } from '../api';
 import { useAuth } from '../AuthContext';
@@ -7,6 +7,8 @@ import { PhotoGrid } from '../components/PhotoGrid';
 import { formatDateThai } from '../lib/format-date';
 import { useDebounce } from '../useDebounce';
 import { DateRangePicker } from '../components/DateRangePicker';
+import { FleetFilterSelect } from '../components/FleetFilterSelect';
+import { useFleetFilter } from '../FleetFilterContext';
 
 type Range = 'today' | 'week' | 'month' | 'custom';
 
@@ -131,6 +133,7 @@ function InspectionModal({ inspection, onClose }: { inspection: InspectionDetail
 
 export function HistoryPage() {
   const { user, isDashboardUser } = useAuth();
+  const { fleetScope } = useFleetFilter();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedRange = searchParams.get('range');
   const initialRange: Range = requestedRange === 'week' || requestedRange === 'month' ? requestedRange : 'today';
@@ -144,13 +147,17 @@ export function HistoryPage() {
   const debouncedSearch = useDebounce(search, 300);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  const loadGenerationRef = useRef(0);
   const HISTORY_PAGE_SIZE = 50;
 
-  const fleetScope = user?.role === 'admin' ? undefined : user?.fleetId;
-
   useEffect(() => {
+    const generation = ++loadGenerationRef.current;
     let cancelled = false;
     (async () => {
+      setSelected(null);
+      setLoadingMore(false);
+      setHistory(null);
+      setHasMore(false);
       if (range === 'custom' && (!customStart || !customEnd || customStart > customEnd)) {
         setLoading(false);
         return;
@@ -163,21 +170,25 @@ export function HistoryPage() {
           limit: HISTORY_PAGE_SIZE,
           offset: 0,
         });
-        if (!cancelled) {
+        if (!cancelled && loadGenerationRef.current === generation) {
           setHistory(data);
           setHasMore(data.inspections.length >= HISTORY_PAGE_SIZE);
         }
       } catch {
-        if (!cancelled) setHistory(null);
+        if (!cancelled && loadGenerationRef.current === generation) setHistory(null);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && loadGenerationRef.current === generation) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (loadGenerationRef.current === generation) loadGenerationRef.current++;
+    };
   }, [range, customStart, customEnd, fleetScope, debouncedSearch]);
 
   async function loadMore() {
     if (!history || loadingMore || !hasMore) return;
+    const generation = loadGenerationRef.current;
     setLoadingMore(true);
     try {
       const { startDate, endDate } = getDateRange(range, customStart, customEnd);
@@ -186,6 +197,7 @@ export function HistoryPage() {
         limit: HISTORY_PAGE_SIZE,
         offset: history.inspections.length,
       });
+      if (loadGenerationRef.current !== generation) return;
       setHistory((current) => current ? {
         ...current,
         inspections: [...current.inspections, ...data.inspections],
@@ -194,7 +206,7 @@ export function HistoryPage() {
     } catch {
       // Keep the records already loaded; the next click can retry.
     } finally {
-      setLoadingMore(false);
+      if (loadGenerationRef.current === generation) setLoadingMore(false);
     }
   }
 
@@ -214,6 +226,9 @@ export function HistoryPage() {
     <div className="stack">
       <div className="page-header">
         <h1>{t('history')}</h1>
+        <div className="header-actions">
+          <FleetFilterSelect />
+        </div>
       </div>
 
       <div className="chip-row">

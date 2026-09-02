@@ -9,6 +9,8 @@ import {
   partitionFailedChecklistPhotos,
 } from '../issue-checklist';
 import { PhotoGrid } from '../components/PhotoGrid';
+import { FleetFilterSelect } from '../components/FleetFilterSelect';
+import { useFleetFilter } from '../FleetFilterContext';
 import { formatDateThai, formatDateTimeThai } from '../lib/format-date';
 
 const statuses = ['', 'open', 'in_progress', 'completed'] as const;
@@ -115,6 +117,7 @@ function IssueModal({ issue, onClose, onStartRepair, onCompleteRepair, updating 
 
 export function IssuesPage() {
   const { user, isDashboardUser } = useAuth();
+  const { fleetScope } = useFleetFilter();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedStatus = searchParams.get('status');
   const initialStatus = statuses.includes(requestedStatus as (typeof statuses)[number])
@@ -126,12 +129,11 @@ export function IssuesPage() {
   const [selected, setSelected] = useState<IssueRow | null>(null);
   const [updating, setUpdating] = useState(false);
 
-  const fleetScope = user?.role === 'admin' ? undefined : user?.fleetId;
-
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
+      setSelected(null);
       try {
         const rows = await fetchIssues(status || undefined, fleetScope);
         if (!cancelled) setIssues(rows);
@@ -183,6 +185,9 @@ export function IssuesPage() {
     <div className="stack">
       <div className="page-header">
         <h1>{t('issues')}</h1>
+        <div className="header-actions">
+          <FleetFilterSelect />
+        </div>
       </div>
 
       <div className="chip-row">

@@ -16,6 +16,8 @@ import {
 } from '../api';
 import { useAuth } from '../AuthContext';
 import { InspectionResultDialog } from '../components/InspectionResultDialog';
+import { FleetFilterSelect } from '../components/FleetFilterSelect';
+import { useFleetFilter } from '../FleetFilterContext';
 import {
   INSPECTION_ZONES,
   ZONE_SECTIONS,
@@ -132,6 +134,7 @@ function savedStatus(log: VehicleInspectionLog) {
 
 export function InspectionsPage() {
   const { user, isDashboardUser } = useAuth();
+  const { fleetScope } = useFleetFilter();
   const locale = getLang();
   const [vehicles, setVehicles] = useState<InspectionVehicle[]>([]);
   const [vehiclesLoading, setVehiclesLoading] = useState(true);
@@ -199,13 +202,22 @@ export function InspectionsPage() {
     async function loadVehicles() {
       setVehiclesLoading(true);
       setVehiclesError(false);
+      setVehicles([]);
+      setSavedInspections([]);
+      setSavedLoading(false);
+      setDetailInspectionId(null);
       try {
         const next: InspectionVehicle[] = [];
         const pageSize = 500;
         let offset = 0;
         let total = 1;
         while (offset < total) {
-          const page = await fetchInspectionVehicles({ limit: pageSize, offset, signal: controller.signal });
+          const page = await fetchInspectionVehicles({
+            limit: pageSize,
+            offset,
+            fleetId: fleetScope,
+            signal: controller.signal,
+          });
           next.push(...page.vehicles);
           total = page.total;
           if (page.vehicles.length === 0) break;
@@ -221,7 +233,7 @@ export function InspectionsPage() {
     }
     void loadVehicles();
     return () => controller.abort();
-  }, [reloadKey]);
+  }, [fleetScope, reloadKey]);
 
   useEffect(() => {
     if (!selectedVehicle || !user) return;
@@ -313,7 +325,12 @@ export function InspectionsPage() {
   }, [frequency, reloadKey, selectedVehicle, user]);
 
   useEffect(() => {
-    if (!selectedVehicle) return;
+    setSavedInspections([]);
+    setDetailInspectionId(null);
+    if (!selectedVehicle) {
+      setSavedLoading(false);
+      return;
+    }
     const controller = new AbortController();
     setSavedLoading(true);
     fetchVehicleInspections(selectedVehicle.id, undefined, controller.signal)
@@ -461,9 +478,12 @@ export function InspectionsPage() {
           <h1>{t('inspections')}</h1>
           <p className="muted">{t('inspectionPageSubtitle')}</p>
         </div>
-        <div className="inspection-page__date">
-          <span>{t('inspectionDate')}</span>
-          <strong>{getTodayThai()}</strong>
+        <div className="header-actions">
+          <FleetFilterSelect />
+          <div className="inspection-page__date">
+            <span>{t('inspectionDate')}</span>
+            <strong>{getTodayThai()}</strong>
+          </div>
         </div>
       </div>
 
@@ -832,7 +852,7 @@ export function InspectionsPage() {
               {!savedLoading && savedInspections.length === 0 && (
                 <div className="inspection-inline-state">{t('noSavedInspections')}</div>
               )}
-              {savedInspections.map((log) => (
+              {!savedLoading && savedInspections.map((log) => (
                 <article className="inspection-saved-row" key={log.id}>
                   <div className="inspection-saved-row__top">
                     <div>

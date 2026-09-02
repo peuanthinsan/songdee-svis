@@ -280,11 +280,18 @@ export type VehicleInspectionLog = InspectionDetail & {
   }>;
 };
 
-export function fetchInspectionVehicles(params?: { limit?: number; offset?: number; search?: string; signal?: AbortSignal }) {
+export function fetchInspectionVehicles(params?: {
+  limit?: number;
+  offset?: number;
+  search?: string;
+  fleetId?: string;
+  signal?: AbortSignal;
+}) {
   const qs = new URLSearchParams();
   if (params?.limit) qs.set('limit', String(params.limit));
   if (params?.offset) qs.set('offset', String(params.offset));
   if (params?.search) qs.set('search', params.search);
+  if (params?.fleetId) qs.set('fleetId', params.fleetId);
   const query = qs.toString();
   return apiFetch<{ vehicles: InspectionVehicle[]; total: number; limit: number; offset: number }>(
     `/api/vehicles${query ? `?${query}` : ''}`,

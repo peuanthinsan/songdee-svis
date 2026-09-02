@@ -9,6 +9,7 @@ import { InspectionsPage } from './pages/InspectionsPage';
 import { LoginPage } from './pages/LoginPage';
 import { ChecklistPage } from './pages/ChecklistPage';
 import { ExportPage } from './pages/ExportPage';
+import { FleetFilterProvider } from './FleetFilterContext';
 
 export default function App() {
   return (
@@ -16,7 +17,7 @@ export default function App() {
       <BrowserRouter basename="/dashboard">
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route element={<Layout />}>
+          <Route element={<FleetFilterProvider><Layout /></FleetFilterProvider>}>
             <Route index element={<DashboardPage />} />
             <Route path="export" element={<ExportPage />} />
             <Route path="inspections" element={<InspectionsPage />} />

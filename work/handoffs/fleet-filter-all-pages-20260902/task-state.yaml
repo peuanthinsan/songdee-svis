@@ -1,0 +1,22 @@
+task_id: fleet-filter-all-pages-20260902
+objective: Review the Codex cross-page web fleet filter implementation.
+active_root: Codex
+delegated_provider: Claude Code
+requested_lane: review
+status: fallback_review_approved
+base_ref: c119e72df98b5a1cabab5971380b0b53fd37cb6c
+branch: codex/issues-failed-checklist-items
+writer_lease:
+  implementation_owner: Codex
+  reviewer_access: read_only
+  reviewer_writable_path: work/handoffs/fleet-filter-all-pages-20260902/receipt.md
+verification:
+  dashboard_build: passed
+  targeted_test: passed_5_of_5
+  browser_verification: passed
+  diff_check: passed
+review:
+  opposite_provider: blocked_not_authenticated
+  fallback_provider: Codex_read_only_subagent
+  fallback_verdict: APPROVE
+updated_at: 2026-09-02T00:00:00+07:00
