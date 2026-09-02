@@ -1,0 +1,17 @@
+task_id: issues-checklist-category-20260901
+active_root: codex
+delegated_provider: claude
+phase: verified
+requested_lane: review
+observed_active_model: GPT-5
+observed_active_effort: UNKNOWN
+requested_review_model: fable
+requested_review_effort: high
+base_ref: d7a2038ec8abfe89013b8648c897062d3529d3ea
+writer_lease: active_root_source_delegated_receipt_only
+status: complete
+review_status: opposite_provider_unavailable
+external_mutations: prohibited
+git_mutations: prohibited
+database_mutations: prohibited
+deployment: prohibited
